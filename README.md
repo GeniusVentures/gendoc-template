@@ -10,8 +10,8 @@ Add as a git submodule, configure one YAML file, and get a complete documentatio
 # Add to your GNUS project
 git submodule add https://github.com/GeniusVentures/gendoc-template.git gendoc-template
 
-# Copy and edit the config
-cp gendoc-template/gendoc.yml gendoc.yml
+# Copy the example config and edit for your project
+cp gendoc-template/gendoc.yml.example gendoc.yml
 
 # Install Python dependencies
 python3 -m venv .venv && source .venv/bin/activate
@@ -23,7 +23,7 @@ cd gendoc-template && mkdocs serve
 
 ## Configuration
 
-Edit `gendoc.yml` to point at your project:
+Edit `gendoc.yml` (copied from `gendoc.yml.example`) to point at your project:
 
 ```yaml
 project:
@@ -42,7 +42,7 @@ deploy:
 
 ```
 gendoc-template/
-├── gendoc.yml              # Config template (copy and edit)
+├── gendoc.yml.example      # Config template (copy and edit)
 ├── mkdocs.yml              # MkDocs + Material theme
 ├── requirements.txt        # Python dependencies
 ├── scripts/                # Build hooks and navigation
