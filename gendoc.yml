@@ -1,0 +1,60 @@
+# gendoc.yml — gendoc-template configuration
+# Fill out this file for your C++ project. All paths are relative to this file's
+# location (the gendoc-template submodule root) unless noted otherwise.
+
+# ── Project identification ──────────────────────────────────────────────────
+project:
+  name: "MyProject"                           # Used as Doxygen PROJECT_NAME and MkDocs site_name
+  number: "0.1"                               # Doxygen PROJECT_NUMBER (version tag)
+  brief: "C++ cross-platform library"         # Doxygen PROJECT_BRIEF (one-line description)
+  logo: ""                                    # Optional: path to project logo (max 200x55px)
+
+# ── Paths (relative to the HOST PROJECT root — the repo containing the submodule) ──
+paths:
+  handwritten_docs: "docs"                    # Directory with hand-written markdown (becomes MkDocs docs_dir)
+  cpp_source: "src"                           # C++ source root (Doxygen INPUT). Can be a space-separated list of dirs.
+  exclude_patterns:                           # Source paths to exclude from Doxygen (e.g., thirdparty code)
+    - "*/thirdparty/*"
+    - "*/build/*"
+
+# ── MkDocs configuration ────────────────────────────────────────────────────
+mkdocs:
+  site_dir: "site"                            # MkDocs output directory (also Wrangler pages_build_output_dir)
+  use_directory_urls: true                    # Clean URLs without .html extension
+  strict: false                               # Build with --strict (warnings become errors)
+
+# ── Doxygen configuration ───────────────────────────────────────────────────
+doxygen:
+  output_dir: "doxygen-output"                # Intermediate XML output directory (gitignored)
+  generate_xml: true                          # Must be true for doxybook2 pipeline
+  generate_html: false                        # Not needed — MkDocs handles HTML
+  file_patterns:                              # Source file extensions to scan
+    - "*.c"
+    - "*.cpp"
+    - "*.cxx"
+    - "*.h"
+    - "*.hpp"
+    - "*.hxx"
+    - "*.java"
+    - "*.py"
+    - "*.cs"
+  recursive: true                             # Recurse into cpp_source subdirectories
+  strip_from_path: ""                         # Prefix to strip from file paths in generated docs
+
+# ── API reference (doxybook2) ───────────────────────────────────────────────
+api_reference:
+  output_subdir: "api-reference"              # Subdirectory under handwritten_docs for generated API docs
+  base_url: "/api-reference/"                 # URL base path in the site nav for generated API pages
+  folders_to_generate:                        # Doxygen index categories to convert to markdown
+    - "classes"
+    - "files"
+    - "modules"
+    - "namespaces"
+    - "pages"
+
+# ── Deploy (Cloudflare Pages via Wrangler) ──────────────────────────────────
+deploy:
+  cloudflare:
+    pages_project_name: "myproject-docs"       # Wrangler pages project name
+    compatibility_date: "2024-01-01"           # Cloudflare compatibility date
+    # Set CF_API_TOKEN and CF_ACCOUNT_ID in environment, not in this file
