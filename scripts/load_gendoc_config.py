@@ -31,13 +31,20 @@ def on_config(config):
     """
     # Resolve paths relative to this script's location.
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    template_root = os.path.dirname(script_dir)  # scripts/ → template root
-    gendoc_path = os.path.join(template_root, "gendoc.yml")
+    template_root = os.path.dirname(script_dir)   # scripts/ → template root
+    host_project_root = os.path.dirname(template_root)  # template/ → host project root
+
+    # Look for gendoc.yml in the host project root (not in the submodule).
+    # The submodule only contains gendoc.yml.example — the filled-out config
+    # lives in the host project so the submodule stays read-only.
+    gendoc_path = os.path.join(host_project_root, "gendoc.yml")
 
     if not os.path.isfile(gendoc_path):
+        example_path = os.path.join(template_root, "gendoc.yml.example")
         logger.warning(
-            "load_gendoc_config: %s not found — using mkdocs.yml defaults",
-            gendoc_path,
+            "load_gendoc_config: %s not found. "
+            "Copy %s to %s and edit for your project.",
+            gendoc_path, example_path, gendoc_path,
         )
         return config
 
