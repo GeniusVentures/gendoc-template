@@ -60,6 +60,8 @@ PROJECT_NAME=$(read_yaml "project.name")
 PAGES_PROJECT_NAME=$(read_yaml "deploy.cloudflare.pages_project_name")
 PRODUCTION_BRANCH=$(read_yaml "deploy.cloudflare.production_branch")
 CUSTOM_DOMAIN=$(read_yaml "deploy.cloudflare.custom_domain")
+COMPATIBILITY_DATE=$(read_yaml "deploy.cloudflare.compatibility_date")
+SITE_DIR=$(read_yaml "mkdocs.site_dir")
 
 if [ -z "$PAGES_PROJECT_NAME" ]; then
     echo "Error: deploy.cloudflare.pages_project_name is required in gendoc.yml" >&2
@@ -104,6 +106,29 @@ if [ -n "$CUSTOM_DOMAIN" ]; then
         echo "  Cloudflare will provision the SSL certificate automatically."
     fi
 fi
+
+# ── Generate wrangler.toml from template ─────────────────────────────────────
+SITE_DIR="${SITE_DIR:-site}"
+SITE_DIR_ABS="$HOST_ROOT/$SITE_DIR"
+COMPATIBILITY_DATE="${COMPATIBILITY_DATE:-2024-01-01}"
+WRANGLER_TPL="$TEMPLATE_ROOT/wrangler.toml.template"
+WRANGLER_OUT="$TEMPLATE_ROOT/wrangler.toml"
+
+echo ""
+echo "Generating wrangler.toml from template..."
+
+python3 -c "
+import sys
+with open(sys.argv[1], 'r') as f:
+    content = f.read()
+content = content.replace('{{PAGES_PROJECT_NAME}}', sys.argv[2])
+content = content.replace('{{COMPATIBILITY_DATE}}', sys.argv[3])
+content = content.replace('{{SITE_DIR}}', sys.argv[4])
+with open(sys.argv[5], 'w') as f:
+    f.write(content)
+" "$WRANGLER_TPL" "$PAGES_PROJECT_NAME" "$COMPATIBILITY_DATE" "$SITE_DIR_ABS" "$WRANGLER_OUT"
+
+echo "  wrangler.toml written to $WRANGLER_OUT"
 
 # ── Done ─────────────────────────────────────────────────────────────────────
 echo ""
