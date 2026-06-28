@@ -285,8 +285,13 @@ def write_root_nav(docs_dir, api_dir):
     # ── Parse hand-written SUMMARY.md ────────────────────────────────────────
     summary_path = os.path.join(docs_dir, "SUMMARY.md")
     if not os.path.isfile(summary_path):
-        print(f"Warning: {summary_path} not found — root nav will contain only the API Reference section",
+        print(f"Warning: {summary_path} not found — generating nav from directory contents",
               file=sys.stderr)
+        # Add index.md or README.md as the home page entry if it exists
+        for home_candidate in ("index.md", "README.md"):
+            if os.path.isfile(os.path.join(docs_dir, home_candidate)):
+                items.append((0, "Home", home_candidate))
+                break
     else:
         with open(summary_path, 'r', encoding='utf-8') as fh:
             for line in fh:
