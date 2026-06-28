@@ -14,9 +14,9 @@ if [ ! -f "$GENDOC_YML" ]; then
     exit 1
 fi
 
-BUILD_API_REFERENCE_SCRIPT="$TEMPLATE_ROOT/scripts/build_api_reference.sh"
+BUILD_API_REFERENCE_SCRIPT="$TEMPLATE_ROOT/scripts/build_source_reference.sh"
 if [ ! -f "$BUILD_API_REFERENCE_SCRIPT" ]; then
-    echo "Error: build_api_reference.sh not found at $BUILD_API_REFERENCE_SCRIPT" >&2
+    echo "Error: build_source_reference.sh not found at $BUILD_API_REFERENCE_SCRIPT" >&2
     exit 1
 fi
 
@@ -93,7 +93,7 @@ if bash "$BUILD_API_REFERENCE_SCRIPT"; then
     echo "  API reference build completed successfully"
 else
     exit_code=$?
-    echo "Error: build_api_reference.sh failed with exit code $exit_code" >&2
+    echo "Error: build_source_reference.sh failed with exit code $exit_code" >&2
     exit $exit_code
 fi
 
