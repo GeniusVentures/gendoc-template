@@ -5,6 +5,14 @@
 # MkDocs build output
 site/
 
+# Doxygen intermediate output
+doxygen-output/
+
+# Editor and OS artifacts
+.DS_Store
+*.swp
+*.swo
+
 # Python virtual environment and cache
 .venv/
 __pycache__/

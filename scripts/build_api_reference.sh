@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 HOST_ROOT="$(cd "$TEMPLATE_ROOT/.." && pwd)"
-GENDOC_YML="$TEMPLATE_ROOT/gendoc.yml"
+GENDOC_YML="$HOST_ROOT/gendoc.yml"
 
 # ── Validate prerequisites ────────────────────────────────────────────────────
 if [ ! -f "$GENDOC_YML" ]; then
