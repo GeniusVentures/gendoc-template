@@ -57,4 +57,4 @@ deploy:
   cloudflare:
     pages_project_name: "myproject-docs"       # Wrangler pages project name
     compatibility_date: "2024-01-01"           # Cloudflare compatibility date
-    # Set CF_API_TOKEN and CF_ACCOUNT_ID in environment, not in this file
+    # Authenticate once with: wrangler login

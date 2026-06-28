@@ -31,15 +31,10 @@ if ! command -v python3 &>/dev/null; then
     exit 1
 fi
 
-if [ -z "${CF_API_TOKEN:-}" ]; then
-    echo "Error: CF_API_TOKEN environment variable is not set." >&2
-    echo "       Set it with: export CF_API_TOKEN=<your-token>" >&2
-    exit 1
-fi
-
-if [ -z "${CF_ACCOUNT_ID:-}" ]; then
-    echo "Error: CF_ACCOUNT_ID environment variable is not set." >&2
-    echo "       Set it with: export CF_ACCOUNT_ID=<your-account-id>" >&2
+# ── Verify wrangler is authenticated ──────────────────────────────────────────
+if ! wrangler whoami &>/dev/null; then
+    echo "Error: not logged into Cloudflare." >&2
+    echo "       Run: wrangler login" >&2
     exit 1
 fi
 
@@ -134,7 +129,7 @@ echo "Deploying to Cloudflare Pages..."
 
 cd "$TEMPLATE_ROOT"
 
-if CF_API_TOKEN="$CF_API_TOKEN" CF_ACCOUNT_ID="$CF_ACCOUNT_ID" wrangler pages deploy "$SITE_DIR_ABS" --project-name "$PAGES_PROJECT_NAME"; then
+if wrangler pages deploy "$SITE_DIR_ABS" --project-name "$PAGES_PROJECT_NAME"; then
     echo ""
     echo "=============================================="
     echo "  Deployment complete"
