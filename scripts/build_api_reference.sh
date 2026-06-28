@@ -256,7 +256,7 @@ NAV_SCRIPT="$SCRIPT_DIR/build_navigation.py"
 if [ ! -f "$NAV_SCRIPT" ]; then
     echo "Warning: build_navigation.py not found at $NAV_SCRIPT — skipping navigation generation" >&2
 else
-    python3 "$NAV_SCRIPT" --api-dir "$API_OUTPUT_ABS"
+    python3 "$NAV_SCRIPT" --api-dir "$API_OUTPUT_ABS" --docs-dir "$HANDWRITTEN_DOCS_ABS"
 fi
 
 # ── Success ───────────────────────────────────────────────────────────────────

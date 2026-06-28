@@ -48,7 +48,7 @@ theme:
 plugins:
   - search
   - literate-nav:
-      nav_file: SUMMARY.md
+      nav_file: SUMMARY_EXT.md
 
 validation:
   links:
