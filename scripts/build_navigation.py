@@ -266,10 +266,96 @@ def generate_category_pages(api_dir, force=False):
     return generated
 
 
+def write_root_nav(docs_dir, api_dir):
+    """
+    Merge hand-written SUMMARY.md with generated API reference category navigation
+    into a single SUMMARY_EXT.md at docs_dir.
+
+    Reads the host project's SUMMARY.md, parses its hand-written sections (skipping
+    any "API Reference" section), appends an API Reference section built from the
+    per-category SUMMARY_EXT.md files, and writes the merged result.
+
+    If SUMMARY.md is missing, prints a warning and proceeds with API-reference-only
+    navigation.  If no API reference categories exist, the hand-written sections
+    are preserved alone.
+    """
+    items = []
+    in_api_ref = False
+
+    # ── Parse hand-written SUMMARY.md ────────────────────────────────────────
+    summary_path = os.path.join(docs_dir, "SUMMARY.md")
+    if not os.path.isfile(summary_path):
+        print(f"Warning: {summary_path} not found — root nav will contain only the API Reference section",
+              file=sys.stderr)
+    else:
+        with open(summary_path, 'r', encoding='utf-8') as fh:
+            for line in fh:
+                stripped = line.rstrip('\n')
+                # Section headings
+                if stripped.startswith('## '):
+                    heading = stripped[3:].strip()
+                    if heading.lower() == 'api reference':
+                        in_api_ref = True
+                    else:
+                        in_api_ref = False
+                        items.append((0, heading, None))
+                    continue
+
+                # Skip lines inside the API Reference replacement zone
+                if in_api_ref:
+                    continue
+
+                # Skip empty lines
+                if not stripped.strip():
+                    continue
+
+                # List items: must start with "* " or "- "
+                if not (stripped.lstrip().startswith('* ') or stripped.lstrip().startswith('- ')):
+                    continue
+
+                leading_spaces = len(stripped) - len(stripped.lstrip())
+                indent = (leading_spaces // 4) + 1
+
+                # Link item: [text](url)
+                match = re.search(r'\[([^\]]+)\]\(([^)#]+)', stripped)
+                if match:
+                    items.append((indent, match.group(1), match.group(2)))
+                else:
+                    # Unlinked label
+                    label = stripped.lstrip()[2:].strip()
+                    items.append((indent, label, None))
+
+    # ── Append API Reference section ────────────────────────────────────
+    categories = ["Classes", "Files", "Namespaces", "Modules", "Pages"]
+    api_dir_basename = os.path.basename(api_dir)
+    api_items = []
+
+    for category in categories:
+        cat_summary = os.path.join(api_dir, category, "SUMMARY_EXT.md")
+        if os.path.isfile(cat_summary):
+            api_items.append((1, category, f"{api_dir_basename}/{category}/README.md"))
+
+    if api_items:
+        items.append((0, "API Reference", None))
+        items.extend(api_items)
+
+    # ── Build and write SUMMARY_EXT.md ─────────────────────────────────────
+    nav_content = build_literate_nav(items)
+    output_path = os.path.join(docs_dir, "SUMMARY_EXT.md")
+    with open(output_path, 'w', encoding='utf-8') as fh:
+        fh.write(nav_content)
+
+    cat_count = len(api_items)
+    total = len(items)
+    print(f"Root SUMMARY_EXT.md written to {output_path} ({total} nav entries, {cat_count} API categories)")
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Build SUMMARY_EXT.md navigation files.")
     parser.add_argument("--api-dir", required=True, help="Path to generated API reference directory (doxybook2 output)")
+    parser.add_argument("--docs-dir", default=None,
+                        help="Path to hand-written docs directory (triggers root SUMMARY_EXT.md generation)")
     parser.add_argument("--force", action="store_true", help="Force regeneration even if up to date")
     args = parser.parse_args()
 
@@ -281,7 +367,14 @@ if __name__ == "__main__":
 
     if generated:
         print(f"\nSuccessfully generated {len(generated)} SUMMARY_EXT.md files")
-        sys.exit(0)
     else:
         print("No SUMMARY_EXT.md changes needed (already up to date)")
-        sys.exit(0)
+
+    # Generate root navigation if --docs-dir was provided
+    if args.docs_dir:
+        if not os.path.isdir(args.docs_dir):
+            print(f"Error: docs directory not found: {args.docs_dir}", file=sys.stderr)
+            sys.exit(1)
+        write_root_nav(args.docs_dir, args.api_dir)
+
+    sys.exit(0)
