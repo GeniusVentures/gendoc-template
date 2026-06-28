@@ -91,20 +91,15 @@ else
     echo "  or run: gendoc-template/scripts/deploy.sh"
 fi
 
-# ── Set up custom domain ─────────────────────────────────────────────────────
+# ── Custom domain instructions ────────────────────────────────────────────────
 if [ -n "$CUSTOM_DOMAIN" ]; then
     echo ""
-    echo "Setting up custom domain '$CUSTOM_DOMAIN'..."
-
-    if wrangler pages project list domains "$PAGES_PROJECT_NAME" 2>/dev/null | grep -q "$CUSTOM_DOMAIN"; then
-        echo "  Domain '$CUSTOM_DOMAIN' already configured — skipping."
-    else
-        wrangler pages project domains add "$PAGES_PROJECT_NAME" "$CUSTOM_DOMAIN"
-        echo ""
-        echo "  Domain '$CUSTOM_DOMAIN' added to '$PAGES_PROJECT_NAME'."
-        echo "  Add the CNAME record shown above to your DNS provider."
-        echo "  Cloudflare will provision the SSL certificate automatically."
-    fi
+    echo "To set up a custom domain, configure it in the Cloudflare Dashboard:"
+    echo ""
+    echo "  1. Open: https://dash.cloudflare.com/ → Pages → $PAGES_PROJECT_NAME → Custom Domains"
+    echo "  2. Add: $CUSTOM_DOMAIN"
+    echo "  3. Create a CNAME record pointing $CUSTOM_DOMAIN to $PAGES_PROJECT_NAME.pages.dev"
+    echo "  4. Cloudflare will auto-provision the SSL certificate"
 fi
 
 # ── Generate wrangler.toml from template ─────────────────────────────────────
