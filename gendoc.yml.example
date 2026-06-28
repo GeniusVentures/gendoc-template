@@ -56,5 +56,7 @@ api_reference:
 deploy:
   cloudflare:
     pages_project_name: "myproject-docs"       # Wrangler pages project name
+    production_branch: "main"                  # Git branch that triggers production deploy
+    custom_domain: ""                          # Optional: custom domain (e.g. docs.example.com)
     compatibility_date: "2024-01-01"           # Cloudflare compatibility date
     # Authenticate once with: wrangler login
