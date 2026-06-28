@@ -1,0 +1,7 @@
+# Wrangler configuration for Cloudflare Pages deployment
+# Generated from wrangler.toml.template — {{TOKENS}} are substituted
+# from gendoc.yml deploy.cloudflare values by deploy.sh.
+
+name = "{{PAGES_PROJECT_NAME}}"
+compatibility_date = "{{COMPATIBILITY_DATE}}"
+pages_build_output_dir = "{{SITE_DIR}}"
