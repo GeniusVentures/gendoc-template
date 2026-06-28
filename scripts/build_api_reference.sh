@@ -89,8 +89,8 @@ GENERATE_HTML_RAW=$(read_yaml "doxygen.generate_html")
 FILE_PATTERNS_RAW=$(read_yaml "doxygen.file_patterns")
 RECURSIVE_RAW=$(read_yaml "doxygen.recursive")
 STRIP_FROM_PATH=$(read_yaml "doxygen.strip_from_path")
-API_OUTPUT_SUBDIR=$(read_yaml "api_reference.output_subdir")
-BASE_URL=$(read_yaml "api_reference.base_url")
+API_OUTPUT_SUBDIR=$(read_yaml "source_reference.output_subdir")
+BASE_URL=$(read_yaml "source_reference.base_url")
 
 # ── Validate required values ──────────────────────────────────────────────────
 if [ -z "$PROJECT_NAME" ]; then

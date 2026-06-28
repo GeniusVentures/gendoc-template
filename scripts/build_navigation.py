@@ -122,7 +122,7 @@ def _normalize_url(url, category_dir, category_path, link_text, api_dir_basename
     """
     Normalize a link target to be relative to the category directory.
 
-    Doxybook generates absolute paths like /api-reference/Files/d5/df0/foo/
+    Doxybook generates absolute paths like /source-reference/Files/d5/df0/foo/
     literate-nav treats any absolute path as an external resource, so we
     must strip the leading <api_dir_basename>/<category>/ prefix to produce a
     plain relative path like d5/df0/foo/ that literate-nav resolves

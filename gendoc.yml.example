@@ -41,10 +41,10 @@ doxygen:
   recursive: true                             # Recurse into cpp_source subdirectories
   strip_from_path: ""                         # Prefix to strip from file paths in generated docs
 
-# ── API reference (doxybook2) ───────────────────────────────────────────────
-api_reference:
-  output_subdir: "api-reference"              # Subdirectory under handwritten_docs for generated API docs
-  base_url: "/api-reference/"                 # URL base path in the site nav for generated API pages
+# ── Source reference (doxybook2) ───────────────────────────────────────────────
+source_reference:
+  output_subdir: "source-reference"              # Subdirectory under handwritten_docs for generated source docs
+  base_url: "/source-reference/"                 # URL base path in the site nav for generated source pages
   folders_to_generate:                        # Doxygen index categories to convert to markdown
     - "classes"
     - "files"
