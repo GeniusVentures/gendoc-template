@@ -361,7 +361,8 @@
     const s = document.createElement("style");
     s.id = "nav-state-style";
     s.textContent =
-      ".nav-state-restoring * {" +
+      ".nav-state-restoring .md-sidebar--primary," +
+      ".nav-state-restoring .md-sidebar--primary * {" +
       "  transition: none !important;" +
       "  animation: none !important;" +
       "  scroll-behavior: auto !important;" +
