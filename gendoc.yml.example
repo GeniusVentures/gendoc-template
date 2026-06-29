@@ -24,7 +24,7 @@ mkdocs:
 
 # ── Doxygen configuration (shared by all source reference sets) ─────────────
 doxygen:
-  output_dir: "doxygen-output"                # Intermediate XML output directory (gitignored)
+  output_dir: "gendoc-template/doxygen-output" # Intermediate XML output directory (gitignored)
   generate_xml: true                          # Must be true for doxybook2 pipeline
   generate_html: false                        # Not needed — MkDocs handles HTML
   recursive: true                             # Recurse into each set's source directories
