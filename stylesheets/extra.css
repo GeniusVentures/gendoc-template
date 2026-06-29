@@ -206,6 +206,15 @@
     }
 }
 
+/* ── Suppress duplicate nav title labels ──────────────────────────────────── */
+/* Pages with children become collapsible sections.  Material renders a
+   mobile back-navigation label (.md-nav__title) inside the nested <nav>
+   whose text duplicates the parent link.  On desktop the parent already
+   provides the clickable label — hide this redundant copy. */
+.md-nav__item--nested > .md-nav > .md-nav__title {
+    display: none;
+}
+
 /* ── GitBook image / figure alignment ─────────────────────────────────────── */
 /* GitBook centers figures by default — match that behaviour. */
 .md-typeset figure                        { display:block; margin:1rem auto; text-align:center; }

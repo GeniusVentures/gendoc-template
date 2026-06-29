@@ -235,6 +235,82 @@
     });
   }
 
+  // ── Section-index links: clicking the title also expands the section ──────
+  // Material renders a section with an index child as a clickable <a> (the
+  // title, which navigates) plus a separate arrow <label> (which toggles).
+  // Without this, clicking the title navigates but leaves the children
+  // collapsed.  We check the section's toggle so the children expand too, and
+  // dispatch "change" so the existing persistence records/reapplies the state.
+
+  function bindIndexLinkExpanders() {
+    const links = getPrimarySidebar()?.querySelectorAll(".md-nav__container > a.md-nav__link") || [];
+    links.forEach((link) => {
+      if (link.dataset.navStateExpandBound) { return; }
+      link.dataset.navStateExpandBound = "true";
+
+      link.addEventListener("click", () => {
+        const item = link.closest(".md-nav__item--nested");
+        const toggle = item?.querySelector(":scope > input.md-nav__toggle");
+        if (toggle && !toggle.checked) {
+          toggle.checked = true;
+          toggle.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      });
+    });
+  }
+
+
+  // ── Save / restore sidebar scroll position ────────────────────────────
+  const SCROLL_KEY = "nav-scroll-top";
+
+  function bindScrollPersist() {
+    const scroller = getScrollContainer();
+    if (!scroller || scroller.dataset.scrollPersistBound) { return; }
+    scroller.dataset.scrollPersistBound = "true";
+    scroller.addEventListener("scroll", () => {
+      sessionStorage.setItem(SCROLL_KEY, String(scroller.scrollTop));
+    }, { passive: true });
+  }
+
+  // ── Active-item highlighting ─────────────────────────────────────────────
+  // Nav entries here are Link objects (anchors), which Material's built-in
+  // active tracking — keyed off Page objects — ignores.  Match the current
+  // URL (pathname + hash) ourselves and mark the matching link active.
+  var _activeLink = null;
+
+  function updateActiveLink() {
+    const sidebar = getPrimarySidebar();
+    if (!sidebar) { return; }
+
+    // Clear the marker applied on the previous call.  The sidebar DOM is
+    // reused across same-page hash changes, so a stale highlight would linger.
+    if (_activeLink) {
+      _activeLink.classList.remove("md-nav__link--active");
+      const prevItem = _activeLink.closest(".md-nav__item");
+      if (prevItem) { prevItem.classList.remove("md-nav__item--active"); }
+      _activeLink = null;
+    }
+
+    const path = window.location.pathname.replace(/\/$/, "");
+    const hash = window.location.hash;
+    const links = sidebar.querySelectorAll("a.md-nav__link");
+    var best = null;
+    for (var i = 0; i < links.length; i++) {
+      try {
+        var u = new URL(links[i].href);
+        if (u.pathname.replace(/\/$/, "") === path) {
+          if (hash && u.hash === hash) { best = links[i]; break; }   // exact anchor
+          if (!best) { best = links[i]; }                            // page-level fallback
+        }
+      } catch (e) { /* ignore malformed hrefs */ }
+    }
+    if (best) {
+      best.classList.add("md-nav__link--active");
+      const item = best.closest(".md-nav__item");
+      if (item) { item.classList.add("md-nav__item--active"); }
+      _activeLink = best;
+    }
+  }
 
   // ── Restore state (called after every SPA navigation) ────────────────────
 
@@ -255,15 +331,27 @@
     // Re-bind toggle listeners to any new DOM nodes from the SPA swap.
     applySidebarWidthRem(loadSidebarWidthRem());
     bindToggleListeners();
+    bindIndexLinkExpanders();
     bindSidebarResizer();
     bindSidebarWheelIsolation();
+    bindScrollPersist();
 
-    // Re-enable transitions after the browser has painted the restored toggle
-    // state so native sidebar scrolling is left entirely to the browser.
+    // Re-enable transitions and restore saved scroll position.
     requestAnimationFrame(() => {
       syncSidebarHeight();
       document.body.classList.remove("nav-state-restoring");
+
+      const saved = sessionStorage.getItem(SCROLL_KEY);
+      if (saved !== null) {
+        const scroller = getScrollContainer();
+        if (scroller) {
+          scroller.scrollTop = Number(saved);
+        }
+      }
     });
+
+    // Re-highlight the active nav entry for the new URL.
+    setTimeout(updateActiveLink, 50);
   }
 
   // ── No-transition style ───────────────────────────────────────────────────
@@ -293,5 +381,10 @@
 
   window.addEventListener("resize", syncSidebarHeight, { passive: true });
   window.addEventListener("load", syncSidebarHeight, { passive: true });
+
+  // Same-page anchor clicks change the URL hash without an SPA page swap, so
+  // restoreState never runs for them.  Re-highlight on hashchange so picking
+  // an anchor marks it active immediately.
+  window.addEventListener("hashchange", updateActiveLink);
 
 })();

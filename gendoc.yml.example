@@ -12,8 +12,7 @@ project:
 # ── Paths (relative to the HOST PROJECT root — the repo containing the submodule) ──
 paths:
   handwritten_docs: "docs"                    # Directory with hand-written markdown (becomes MkDocs docs_dir)
-  cpp_source: "src"                           # C++ source root (Doxygen INPUT). Can be a space-separated list of dirs.
-  exclude_patterns:                           # Source paths to exclude from Doxygen (e.g., thirdparty code)
+  exclude_patterns:                           # Source paths excluded from every Doxygen run
     - "*/thirdparty/*"
     - "*/build/*"
 
@@ -23,34 +22,55 @@ mkdocs:
   use_directory_urls: true                    # Clean URLs without .html extension
   strict: false                               # Build with --strict (warnings become errors)
 
-# ── Doxygen configuration ───────────────────────────────────────────────────
+# ── Doxygen configuration (shared by all source reference sets) ─────────────
 doxygen:
   output_dir: "doxygen-output"                # Intermediate XML output directory (gitignored)
   generate_xml: true                          # Must be true for doxybook2 pipeline
   generate_html: false                        # Not needed — MkDocs handles HTML
-  file_patterns:                              # Source file extensions to scan
-    - "*.c"
-    - "*.cpp"
-    - "*.cxx"
-    - "*.h"
-    - "*.hpp"
-    - "*.hxx"
-    - "*.java"
-    - "*.py"
-    - "*.cs"
-  recursive: true                             # Recurse into cpp_source subdirectories
+  recursive: true                             # Recurse into each set's source directories
   strip_from_path: ""                         # Prefix to strip from file paths in generated docs
 
-# ── Source reference (doxybook2) ───────────────────────────────────────────────
-source_reference:
-  output_subdir: "source-reference"              # Subdirectory under handwritten_docs for generated source docs
-  base_url: "/source-reference/"                 # URL base path in the site nav for generated source pages
-  folders_to_generate:                        # Doxygen index categories to convert to markdown
-    - "classes"
-    - "files"
-    - "modules"
-    - "namespaces"
-    - "pages"
+# ── Source reference sets (doxygen → doxybook2) ─────────────────────────────
+# One entry per body of source code to document.  Each set runs its own
+# doxygen + doxybook2 pass into handwritten_docs/<output_subdir> and becomes
+# its own nav section labeled with `label`.  Global paths.exclude_patterns
+# apply to every set; per-set exclude_patterns are appended.
+source_references:
+  - name: "cpp"                               # Internal id; used for the intermediate XML directory name
+    label: "C++ Source"                       # Nav section label
+    language: "C++"                           # Language, used in the landing page prose
+    source: "src"                             # Doxygen INPUT (space-separated list of dirs allowed)
+    file_patterns:                            # Source file extensions to scan for this set
+      - "*.cpp"
+      - "*.h"
+      - "*.hpp"
+    exclude_patterns: []                      # Extra excludes for this set only
+    output_subdir: "source-reference"         # Subdir under handwritten_docs for generated docs
+    base_url: "/source-reference/"            # URL base path in the site nav for generated pages
+
+  # Optional second set — e.g. Python.  Remove if you only have one language.
+  - name: "python"
+    label: "Python Source"
+    language: "Python"
+    source: "python"
+    file_patterns:
+      - "*.py"
+    exclude_patterns:
+      - "*/tests/*"
+    output_subdir: "python-reference"
+    base_url: "/python-reference/"
+
+# ── Navigation ────────────────────────────────────────────────────────────────
+# Configure how the root navigation (SUMMARY_EXT.md) is built from hand-written
+# docs and the generated source reference sets.
+navigation:
+  # Hand-written doc sections merged into the nav before the source references.
+  # Each entry defines a nav section with a label and a source markdown file
+  # whose list items are extracted to populate that section.
+  sections:
+    - label: "Documentation"                   # Unlinked nav section label
+      source_file: "index.md"                  # Markdown file containing the link list
+      extract_heading: ""                      # Optional: H2 heading to scope extraction under (empty = all)
 
 # ── Deploy (Cloudflare Pages via Wrangler) ──────────────────────────────────
 deploy:

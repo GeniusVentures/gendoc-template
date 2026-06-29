@@ -14,9 +14,9 @@ if [ ! -f "$GENDOC_YML" ]; then
     exit 1
 fi
 
-BUILD_API_REFERENCE_SCRIPT="$TEMPLATE_ROOT/scripts/build_source_reference.sh"
-if [ ! -f "$BUILD_API_REFERENCE_SCRIPT" ]; then
-    echo "Error: build_source_reference.sh not found at $BUILD_API_REFERENCE_SCRIPT" >&2
+BUILD_SOURCE_REFERENCE_SCRIPT="$TEMPLATE_ROOT/scripts/build_source_reference.sh"
+if [ ! -f "$BUILD_SOURCE_REFERENCE_SCRIPT" ]; then
+    echo "Error: build_source_reference.sh not found at $BUILD_SOURCE_REFERENCE_SCRIPT" >&2
     exit 1
 fi
 
@@ -83,14 +83,14 @@ else
     STRICT_FLAG=""
 fi
 
-# ── Step 1: Build API reference (Doxygen → doxybook2 → navigation) ───────────
+# ── Step 1: Build source reference (Doxygen → doxybook2 → navigation) ────────
 echo ""
 echo "=============================================="
-echo "  Step 1: Building API reference"
+echo "  Step 1: Building source reference"
 echo "=============================================="
 
-if bash "$BUILD_API_REFERENCE_SCRIPT"; then
-    echo "  API reference build completed successfully"
+if bash "$BUILD_SOURCE_REFERENCE_SCRIPT"; then
+    echo "  Source reference build completed successfully"
 else
     exit_code=$?
     echo "Error: build_source_reference.sh failed with exit code $exit_code" >&2
@@ -103,7 +103,7 @@ echo "=============================================="
 echo "  Step 2: Building MkDocs site"
 echo "=============================================="
 
-SITE_DIR_ABS="$HOST_ROOT/$SITE_DIR"
+SITE_DIR_ABS="$TEMPLATE_ROOT/$SITE_DIR"
 echo "  Output directory: $SITE_DIR_ABS"
 
 if mkdocs build -f "$MKDOCS_YML" --site-dir "$SITE_DIR" $STRICT_FLAG; then

@@ -36,7 +36,7 @@
   "linkSuffix": "/",
   "mainPageInRoot": false,
   "mainPageName": "indexpage",
-  "replaceUnderscoresInAnchors": true,
+  "replaceUnderscoresInAnchors": false,
   "sort": false,
   "templateIndexClasses": "index_classes",
   "templateIndexFiles": "index_files",

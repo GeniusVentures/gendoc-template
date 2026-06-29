@@ -104,7 +104,7 @@ fi
 
 # ── Generate wrangler.toml from template ─────────────────────────────────────
 SITE_DIR="${SITE_DIR:-site}"
-SITE_DIR_ABS="$HOST_ROOT/$SITE_DIR"
+SITE_DIR_ABS="$TEMPLATE_ROOT/$SITE_DIR"
 COMPATIBILITY_DATE="${COMPATIBILITY_DATE:-2024-01-01}"
 WRANGLER_TPL="$TEMPLATE_ROOT/wrangler.toml.template"
 WRANGLER_OUT="$TEMPLATE_ROOT/wrangler.toml"

@@ -5,6 +5,8 @@ use_directory_urls: true
 
 hooks:
   - scripts/load_gendoc_config.py
+  - scripts/clean_nav.py
+  - scripts/copy_assets.py
 
 watch:
   - javascripts
