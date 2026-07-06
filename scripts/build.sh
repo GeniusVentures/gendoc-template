@@ -97,10 +97,24 @@ else
     exit $exit_code
 fi
 
-# ── Step 2: Build MkDocs site ─────────────────────────────────────────────────
+# ── Step 2: Regenerate index.md (from hand-written doc headings) ─────────────
+HANDWRITTEN_DOCS=$(read_yaml "paths.handwritten_docs")
+INDEX_SCRIPT="$HOST_ROOT/$HANDWRITTEN_DOCS/generate-index.sh"
 echo ""
 echo "=============================================="
-echo "  Step 2: Building MkDocs site"
+echo "  Step 2: Regenerating index.md"
+echo "=============================================="
+if [ -f "$INDEX_SCRIPT" ]; then
+    bash "$INDEX_SCRIPT"
+    echo "  index.md regenerated from $HANDWRITTEN_DOCS/index.md.template"
+else
+    echo "  Skipped — generate-index.sh not found at $INDEX_SCRIPT"
+fi
+
+# ── Step 3: Build MkDocs site ─────────────────────────────────────────────────
+echo ""
+echo "=============================================="
+echo "  Step 3: Building MkDocs site"
 echo "=============================================="
 
 SITE_DIR_ABS="$TEMPLATE_ROOT/$SITE_DIR"
