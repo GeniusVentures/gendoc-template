@@ -38,7 +38,7 @@ cd gendoc-template/site && python3 -m http.server 8000
 |------|---------|---------|
 | Python 3.9+ | System package or [python.org](https://python.org) | MkDocs and scripts |
 | Doxygen | `brew install doxygen` (macOS) or `apt-get install doxygen` (Linux) | C++ source reference generation |
-| doxybook2 | Install the **GeniusVentures fork v1.6.2** from [GeniusVentures/doxybook2 releases](https://github.com/GeniusVentures/doxybook2/releases/tag/v1.6.2) (not the upstream `npm` package) | Doxygen XML to Markdown conversion |
+| doxybook2 | Download the **GeniusVentures fork v1.6.3** release binaries from [GeniusVentures/doxybook2 releases](https://github.com/GeniusVentures/doxybook2/releases/tag/v1.6.3) (not the upstream `npm` package; Windows binaries coming soon), or run `gendoc-template/scripts/install_deps.sh` for one-command install | Doxygen XML to Markdown conversion |
 | Node.js + Wrangler | `npm install -g wrangler` | Cloudflare Pages deployment |
 | Hand-written docs directory | Create a directory with at minimum a `SUMMARY.md` file (see [Hand-Written Docs](#hand-written-docs)) | Site content |
 
@@ -245,7 +245,7 @@ your-project/                   # HOST PROJECT ROOT
 | `mkdocs: command not found` | Python venv not activated | Run `source .venv/bin/activate` from the host project root, or install mkdocs globally |
 | `Error: paths.handwritten_docs is required` | Missing required config field | Add `paths.handwritten_docs` to `gendoc.yml` pointing at your hand-written docs directory |
 | `Doxygen failed` | `paths.cpp_source` points at a non-existent or empty directory | Verify `paths.cpp_source` points at existing C++ source |
-| `doxybook2 failed` | doxybook2 not installed or wrong version | Install the [GeniusVentures fork v1.6.2](https://github.com/GeniusVentures/doxybook2/releases/tag/v1.6.2) (the upstream `npm` package is not used) |
+| `doxybook2 failed` | doxybook2 not installed or wrong version | Download the [GeniusVentures fork v1.6.3](https://github.com/GeniusVentures/doxybook2/releases/tag/v1.6.3) release binaries (the upstream `npm` package is not used) |
 | `wrangler: command not found` | Wrangler not installed | Run `npm install -g wrangler` |
 | `Error: CF_API_TOKEN environment variable is not set` | Missing deploy credentials | `export CF_API_TOKEN="your-token"` and `export CF_ACCOUNT_ID="your-account-id"` |
 | `Warning: gendoc.yml not found` (during mkdocs serve) | The MkDocs hook looks for gendoc.yml at the host root and falls back to defaults if missing | Create `gendoc.yml` at the host project root, or edit `mkdocs.yml` directly if you prefer |

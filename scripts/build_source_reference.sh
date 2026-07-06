@@ -34,7 +34,9 @@ fi
 
 if ! command -v doxybook2 &>/dev/null; then
     echo "Error: doxybook2 not found." >&2
-    echo "       Install from: https://github.com/GeniusVentures/doxybook2/releases/tag/v1.6.2" >&2
+    echo "       Run:   bash gendoc-template/scripts/install_deps.sh" >&2
+    echo "       Or download manually from:" >&2
+    echo "       https://github.com/GeniusVentures/doxybook2/releases/tag/v1.6.3" >&2
     exit 1
 fi
 
