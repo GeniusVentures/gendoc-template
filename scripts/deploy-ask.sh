@@ -24,8 +24,12 @@ fi
 
 [ -f "$CONFIG" ] || { echo "ERROR: $CONFIG not found -- run from the host project root" >&2; exit 1; }
 command -v wrangler >/dev/null 2>&1 || { echo "ERROR: wrangler not found (npm install -g wrangler)" >&2; exit 1; }
-: "${CF_API_TOKEN:?ERROR: CF_API_TOKEN environment variable is not set}"
-: "${CF_ACCOUNT_ID:?ERROR: CF_ACCOUNT_ID environment variable is not set}"
+# CF_API_TOKEN / CF_ACCOUNT_ID are required for CI/CD headless deploys.
+# For local dev, wrangler login (OAuth) is sufficient -- skip the check.
+if ! wrangler whoami >/dev/null 2>&1; then
+    : "${CF_API_TOKEN:?ERROR: CF_API_TOKEN environment variable is not set (or run: wrangler login)}"
+    : "${CF_ACCOUNT_ID:?ERROR: CF_ACCOUNT_ID environment variable is not set (or run: wrangler login)}"
+fi
 
 # Pull every needed value out of gendoc.yml in one Python pass.
 # Output: one KEY=VALUE per line, consumed into shell variables below.
