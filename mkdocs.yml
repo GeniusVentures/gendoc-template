@@ -4,9 +4,9 @@ site_dir: "site"
 use_directory_urls: true
 
 hooks:
-  - scripts/load_gendoc_config.py
-  - scripts/clean_nav.py
-  - scripts/copy_assets.py
+  - scripts/load-gendoc-config.py
+  - scripts/clean-nav.py
+  - scripts/copy-assets.py
 
 watch:
   - javascripts
@@ -82,7 +82,7 @@ markdown_extensions:
   - md_in_html
 
 extra_css:
-  - /stylesheets/extra.css
+  - /stylesheets/theme.css
 
 extra_javascript:
   - https://unpkg.com/mermaid@10/dist/mermaid.min.js
@@ -92,3 +92,6 @@ extra_javascript:
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
   - /javascripts/nav-state.js
   - /javascripts/breadcrumbs.js
+  - path: /javascripts/ask/main.js
+    type: module
+

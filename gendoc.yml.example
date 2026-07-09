@@ -7,7 +7,7 @@ project:
   name: "MyProject"                           # Used as Doxygen PROJECT_NAME and MkDocs site_name
   number: "0.1"                               # Doxygen PROJECT_NUMBER (version tag)
   brief: "C++ cross-platform library"         # Doxygen PROJECT_BRIEF (one-line description)
-  logo: ""                                    # Optional: path to project logo (max 200x55px)
+  logo: ""                                    # Optional: path to logo relative to handwritten_docs dir
 
 # ── Paths (relative to the HOST PROJECT root — the repo containing the submodule) ──
 paths:
@@ -64,6 +64,10 @@ source_references:
 # Configure how the root navigation (SUMMARY_EXT.md) is built from hand-written
 # docs and the generated source reference sets.
 navigation:
+  # Set true to regenerate index.md from index.md.template + heading structures
+  # during the build. Requires index.md.template in the hand-written docs dir.
+  generate_index: false
+
   # Hand-written doc sections merged into the nav before the source references.
   # Each entry defines a nav section with a label and a source markdown file
   # whose list items are extracted to populate that section.
@@ -80,3 +84,52 @@ deploy:
     custom_domain: ""                          # Optional: custom domain (e.g. docs.example.com)
     compatibility_date: "2024-01-01"           # Cloudflare compatibility date
     # Authenticate once with: wrangler login
+
+llms:
+  enabled: true
+  site_url: "https://docs.mysite.com"         # canonical URL of the deployed site
+  # site_dir: "site"                          # override if build outputs elsewhere
+  corpus_cache: "llms-corpus"                 # committed cache of fetched external docs
+  meta_file: "llms-meta.json"                 # committed editorial metadata
+
+  # Public, link-shared Google Docs mirrored into the corpus as markdown.
+  # Fetched only with `--fetch` (network); cached copies are committed so
+  # normal builds work offline.
+  google_docs:
+    - id: "GOOGLE_DOC_ID_HERE"
+      out: "sales-overview.md"
+      title: "Sales Overview"
+
+  # Audience catalogs and which categories feed them. Categories are
+  # assigned per-document in llms-meta.json (the editorial pass).
+  audiences:
+    llms-sales.txt:
+      title: "Sales & SMB Enablement"
+      categories: [sales, product, pricing]
+    llms-technical.txt:
+      title: "Architecture & Developer Reference"
+      categories: [technical, architecture, api, nodes]
+
+ related_catalogs:
+   - url: "https://otherdocs.mysite.com/llms.txt"
+     title: "My Other Docs"
+     description: "My other docs related to base documents"
+     audiences: [llms-technical.txt, llms-sales.txt]
+
+  # -- Ask AI Widget (optional) -------------------------------------------------
+  # Floating "Ask" button + chat drawer that answers questions only from your
+  # docs. Requires a Cloudflare Worker (deployed by setup.sh).  When
+  # `endpoint` is set, setup.sh injects a route into the wrangler config so
+  # traffic to that domain reaches this worker -- use this for sharing one
+  # worker across multiple projects.
+  ask:
+    enabled: false
+    # endpoint: "https://ask.mysite.com/api/ask"   # custom-domain / shared-worker (optional)
+    # title: "Ask MyProject"
+    # placeholder: "Ask a question..."
+    # worker_name: "myproject-docs-ask"            # default: <pages_project_name>-ask
+    # allowed_origins:                             # default: [site_url]
+    #   - "https://docs.mysite.com"
+    # providers: "openrouter,gemini"
+    # gemini_model: "gemini-2.5-flash"
+    # openrouter_models: "nvidia/nemotron-3-super-120b-a12b:free,nvidia/nemotron-3-ultra-550b-a55b:free,nvidia/nemotron-3-nano-30b-a3b:free"

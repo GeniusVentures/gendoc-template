@@ -3,7 +3,8 @@
 A reusable MkDocs documentation template for GNUS C++ projects.
 
 Add as a git submodule, configure one YAML file, and get a complete documentation site with
-Material theme, mermaid diagrams, mathjax rendering, and Doxygen source reference integration --
+Material theme, mermaid diagrams, mathjax rendering, Doxygen source reference integration,
+`llms.txt` agent catalogs, and an optional "Ask AI" widget grounded on your own docs --
 deployable to Cloudflare Pages.
 
 ## Quick Start
@@ -26,6 +27,10 @@ cp gendoc-template/gendoc.yml.example gendoc.yml
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r gendoc-template/requirements.txt
 
+# One-time Cloudflare setup (creates the Pages project, generates wrangler.toml,
+# and -- if llms.ask.enabled -- deploys the Ask AI worker and prompts for API keys)
+gendoc-template/scripts/setup.sh
+
 # Preview the built site (build first, then serve the site/ directory)
 gendoc-template/scripts/build.sh
 cd gendoc-template/site && python3 -m http.server 8000
@@ -38,8 +43,8 @@ cd gendoc-template/site && python3 -m http.server 8000
 |------|---------|---------|
 | Python 3.9+ | System package or [python.org](https://python.org) | MkDocs and scripts |
 | Doxygen | `brew install doxygen` (macOS) or `apt-get install doxygen` (Linux) | C++ source reference generation |
-| doxybook2 | Download the **GeniusVentures fork v1.6.3** release binaries from [GeniusVentures/doxybook2 releases](https://github.com/GeniusVentures/doxybook2/releases/tag/v1.6.3) (not the upstream `npm` package; Windows binaries coming soon), or run `gendoc-template/scripts/install_deps.sh` for one-command install | Doxygen XML to Markdown conversion |
-| Node.js + Wrangler | `npm install -g wrangler` | Cloudflare Pages deployment |
+| doxybook2 | Download the **GeniusVentures fork v1.6.3** release binaries from [GeniusVentures/doxybook2 releases](https://github.com/GeniusVentures/doxybook2/releases/tag/v1.6.3) (not the upstream `npm` package; Windows binaries coming soon), or run `gendoc-template/scripts/install-deps.sh` for one-command install | Doxygen XML to Markdown conversion |
+| Node.js + Wrangler | `npm install -g wrangler` | Cloudflare deployment, Ask widget compilation (TypeScript is fetched automatically via `npx`) |
 | Hand-written docs directory | Create a directory with at minimum a `SUMMARY.md` file (see [Hand-Written Docs](#hand-written-docs)) | Site content |
 
 Doxygen and doxybook2 are only required if you want source reference documentation (the
@@ -59,7 +64,8 @@ submodule), unless the path starts with `/`.
 | `name` | string | **yes** | Doxygen PROJECT_NAME and MkDocs site_name |
 | `number` | string | no | Doxygen PROJECT_NUMBER version tag |
 | `brief` | string | no | Doxygen PROJECT_BRIEF (one-line description) |
-| `logo` | string | no | Path to project logo image (max 200x55px) |
+| `logo` | string | no | Path to project logo image relative to host project root |
+| `generator` | bool | no | Set `false` to hide "Made with Material for MkDocs" footer attribution |
 
 ### `paths` -- File Paths
 
@@ -108,10 +114,47 @@ every set; each set's `exclude_patterns` are appended.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `pages_project_name` | string | **yes** (for deploy) | Wrangler Pages project name |
+| `production_branch` | string | no | Production branch for the Pages project (default: `"main"`) |
+| `custom_domain` | string | no | Custom domain -- setup.sh prints the dashboard steps |
 | `compatibility_date` | string | **yes** (for deploy) | Cloudflare compatibility date (e.g. `"2024-01-01"`) |
 
-**Credentials:** `CF_API_TOKEN` and `CF_ACCOUNT_ID` are set as environment variables --
-never put them in `gendoc.yml`.
+**Credentials:** `setup.sh` uses `wrangler login` (browser OAuth).  For CI/CD, `deploy.sh`
+uses `CF_API_TOKEN` and `CF_ACCOUNT_ID` environment variables -- never put credentials in
+`gendoc.yml`.
+
+### `llms` -- llms.txt Agent Catalogs
+
+Generates `llms.txt`, `llms-full.txt`, and audience-specific catalogs (`llms-technical.txt`,
+etc.) that AI coding agents use to discover and fetch project documentation. See
+[Agent Catalogs (llms.txt)](#agent-catalogs-llmstxt) for the full workflow.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `enabled` | bool | **yes** | Set `true` to enable catalog generation |
+| `site_url` | string | **yes** | Canonical URL of the deployed site (e.g. `"https://gcs.gnus.ai"`) |
+| `corpus_cache` | string | no | Directory for cached Google Doc exports (default: `"llms-corpus"`) |
+| `meta_file` | string | no | Editorial metadata file (default: `"llms-meta.json"`) |
+| `audiences` | map | no | Audience-specific catalog definitions -- keys are output filenames, values have `title` and `categories` (see [gendoc.yml.example](gendoc.yml.example)) |
+| `google_docs` | list | no | Public Google Docs to fetch as markdown and publish to the corpus |
+| `related_catalogs` | list | no | Links to related `llms.txt` files from other projects |
+| `ask` | map | no | Ask AI widget settings (see below) |
+
+### `llms.ask` -- Ask AI Widget
+
+An optional site widget (floating button + chat drawer) answering questions **only from the
+project's documentation**, with source citations.  See [Ask AI Widget](#ask-ai-widget).
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `enabled` | bool | **yes** | Set `true` to build the widget and deploy its worker |
+| `endpoint` | string | no | Custom worker URL + `/api/ask` for shared-worker / custom-domain setups (e.g. `https://ask.gnus.ai/api/ask`). When unset, `setup.sh` auto-captures the `workers.dev` URL after deploy. |
+| `title` | string | no | Button/drawer title and bot name (default: `"Ask <project.name>"`) |
+| `placeholder` | string | no | Input placeholder text |
+| `worker_name` | string | no | Cloudflare Worker name (default: `<pages_project_name>-ask`) |
+| `allowed_origins` | list | no | Origins allowed to call the worker (default: `[site_url]`) |
+| `providers` | string | no | LLM provider chain, tried in order (default: `"openrouter,gemini"`) |
+| `gemini_model` | string | no | Gemini model id (default: `"gemini-2.5-flash"`) |
+| `openrouter_models` | string | no | Comma-separated OpenRouter `:free` fallback models |
 
 ## Hand-Written Docs
 
@@ -129,15 +172,116 @@ file using GitBook/literate-nav format:
 - [Configuration](guides/configuration.md)
 ```
 
-The template's `build_navigation.py` merges this hand-written navigation with
+The template's `build-navigation.py` merges this hand-written navigation with
 generated source reference pages into a combined `SUMMARY_EXT.md` that MkDocs consumes.
 
 Place your actual markdown files in the same directory as `SUMMARY.md` (or
 subdirectories referenced by relative paths in `SUMMARY.md`).
 
-The source reference sections are appended automatically by `build_navigation.py`
+The source reference sections are appended automatically by `build-navigation.py`
 after your hand-written entries -- one section per `source_references` set.  No
 placeholder heading is needed in `SUMMARY.md`.
+
+## Agent Catalogs (llms.txt)
+
+The build pipeline generates `llms.txt` files -- machine-readable catalogs that AI coding
+agents (Claude Code, Codex, etc.) use to discover, fetch, and reason about your project's
+documentation.  This is based on the [llms.txt](https://llmstxt.org/) standard.
+
+### Generated Files
+
+| File | Purpose |
+|------|---------|
+| `llms.txt` | Master catalog with audience-specific catalog links and key documents |
+| `llms-technical.txt` | Architecture & developer reference -- documents with categories matching `[technical, architecture, api, nodes]` |
+| `llms-full.txt` | Full corpus: all document content inlined for offline agent consumption (excludes source reference sets) |
+
+### How It Works
+
+1. **Scaffold** -- `build-llms.py` scans your `SUMMARY.md` (or `SUMMARY_EXT.md`) to discover
+   every hand-written document, plus each `source_references` set.  It writes a scaffold
+   `llms-meta.json` with content hashes, empty descriptions, and default flags.
+
+2. **Editorial pass** -- Run `/update-catalogs` in Claude Code.  This reads every scaffolded
+   document, writes agent-oriented descriptions (≤140 chars saying what questions each doc
+   answers), assigns categories, pins key whitepaper-tier documents, and marks source
+   reference sets as optional.  The command edits `llms-meta.json` directly.
+
+3. **Regenerate** -- Re-run `build.sh`.  `build-llms.py` reads `llms-meta.json`, reconciles
+   hashes against current content, and emits the final catalog files into the `site/`
+   directory.  A clean run prints "All catalog entries have current descriptions and categories."
+
+### Editorial Metadata (`llms-meta.json`)
+
+This file is committed to the host repo.  Each entry stores:
+
+| Field | Description |
+|-------|-------------|
+| `description` | One line (≤140 chars) telling an AI agent what questions this doc answers |
+| `category` | One of: `sales`, `product`, `pricing`, `technical`, `architecture`, `api`, `nodes`, `token`, `investors` |
+| `optional` | `true` for reference material agents should fetch only when relevant |
+| `pinned` | `true` for ≤5 whitepaper-tier documents featured in the master catalog |
+| `exclude` | `true` to hide from published catalogs |
+| `hash` | Content hash for detecting stale descriptions |
+
+Never edit the generated files under `site/` -- all changes go through `llms-meta.json`
+and a re-run of `build.sh`.
+
+## Ask AI Widget
+
+When `llms.ask.enabled` is `true`, the site gets a floating "✦ Ask" button that opens a
+chat drawer, plus an "Ask AI" row pinned above the built-in search results.  Answers are
+grounded **exclusively on the project's own documentation** and cite source URLs; unrelated
+questions are refused without spending any LLM quota.
+
+### Architecture
+
+Everything for the feature lives under `ask-ai/`:
+
+```
+ask-ai/
+├── widget-src/                 # TypeScript widget source (strict mode)
+├── worker/ask.js               # Cloudflare Worker: /api/ask endpoint
+├── wrangler-ask.toml.template  # Worker config template ({{TOKENS}} from gendoc.yml)
+└── wrangler-ask.toml           # Generated by setup.sh (gitignored)
+```
+
+- **Widget** -- compiled by `scripts/build-widget.sh` (via `npx` TypeScript) to ES modules
+  at `javascripts/ask/` (gitignored), served like every other script asset.  It reads
+  `/ask-config.json` (generated by `build-llms.py`) and silently does nothing when the
+  feature is disabled.  The chat conversation persists across page navigation.
+- **Worker** -- retrieval uses the llms.txt catalogs themselves: entry descriptions are
+  scored against the question, the top documents are fetched and sent to the LLM with a
+  strict "answer only from context" prompt, and the response streams back to the widget.
+  No vector database, no crawler, no per-site index to maintain -- improving the catalog
+  descriptions improves the widget.
+- **Provider chain** -- `gemini,openrouter` by default, tried in order; a provider without
+  a configured key, or one that is over quota, falls through to the next.  Free-tier
+  budgets: Gemini Flash ~1,500 requests/day; OpenRouter `:free` models 50/day (1,000/day
+  after a one-time $10 credit purchase).  Combined: roughly 2,500 answers/day at $10
+  lifetime cost.
+
+### Setup
+
+1. Set `llms.ask.enabled: true` (and optionally `title`, `allowed_origins`, ...) in
+   `gendoc.yml`, then run `gendoc-template/scripts/setup.sh`.  It generates the worker
+   config, deploys the worker (named `<pages_project_name>-ask`), captures the endpoint
+   URL to `ask-ai/.endpoint`, and prompts for the Gemini / OpenRouter API keys (stored
+   as Worker secrets -- never in any file).
+2. Run `build.sh` + `deploy.sh` -- the site now ships `ask-config.json` and the widget
+   activates.
+
+For a shared worker across multiple projects, set `llms.ask.endpoint` to a custom URL
+(e.g. `https://ask.gnus.ai/api/ask`) before running `setup.sh`.  The configured endpoint
+is written to `ask-ai/.endpoint` and used by `build-widget.sh` to generate
+`ask-config.json`.
+
+Re-running `setup.sh` after changing `llms.ask.*` values re-deploys the worker with the
+updated configuration (secrets are only prompted interactively and can be skipped).
+
+**Recommended:** add a Cloudflare rate-limiting rule on the worker route (e.g. 10 req/min
+per IP on `/api/ask`) -- the free plan includes one rule per zone, and it protects the
+shared daily LLM quotas.
 
 ## Building Locally
 
@@ -150,10 +294,19 @@ gendoc-template/scripts/build.sh
 This executes steps in sequence:
 
 1. **Source reference** -- For each `source_references` set, Doxygen parses the source,
-   doxybook2 converts the XML to Markdown, and `build_navigation.py` merges each set's
+   doxybook2 converts the XML to Markdown, and `build-navigation.py` merges each set's
    navigation into your hand-written nav.
-2. **MkDocs build** -- MkDocs builds the static site into the configured `site_dir`
+2. **Index regeneration** -- `generate-index.sh` rebuilds `index.md` from
+   `index.md.template` and heading structures extracted from all hand-written
+   `.md` files (skipped silently when the script or template is absent).
+3. **Ask widget** -- `build-widget.sh` compiles `ask-ai/widget-src/` to ES modules at
+   `javascripts/ask/` and generates `ask-config.json` (skipped when
+   `llms.ask.enabled` is `false` -- the widget no-ops without it).
+4. **MkDocs build** -- MkDocs builds the static site into the configured `site_dir`
    (default `site/`).
+5. **Agent catalogs** -- `build-llms.py` generates `llms.txt`, `llms-full.txt`,
+   and audience-specific catalogs from `SUMMARY.md` and `llms-meta.json` (if
+   `llms.enabled` is `true` in `gendoc.yml`).
 
 Preview the built site by serving the `site/` directory with a static server. The
 generated source reference links are root-absolute (e.g. `/source-reference/...`), so
@@ -173,16 +326,23 @@ Subsequent builds are faster since Doxygen uses its own incremental cache.
 If you only want hand-written content (no source reference), run `build.sh` (which still
 runs the MkDocs build step) and then serve `site/` as above.
 
-## Deploying to Cloudflare Pages
+## Deploying to Cloudflare
 
-Prerequisites:
-- Wrangler installed (`npm install -g wrangler`)
-- `CF_API_TOKEN` and `CF_ACCOUNT_ID` set as environment variables
-- `deploy.cloudflare.pages_project_name` and `deploy.cloudflare.compatibility_date`
-  set in `gendoc.yml`
+**One-time setup** (per host project):
 
 ```bash
-# Set credentials in the environment
+gendoc-template/scripts/setup.sh
+```
+
+Authenticates via browser OAuth (`wrangler login`), creates the Pages project, generates
+`wrangler.toml`, prints custom-domain instructions, and -- when `llms.ask.enabled` -- deploys
+the Ask AI worker and prompts for provider API keys.  Safe to re-run; it skips what already
+exists and syncs worker configuration changes.
+
+**Deploying the site** (every release):
+
+```bash
+# For CI/CD or headless environments, credentials come from the environment:
 export CF_API_TOKEN="your-cloudflare-api-token"
 export CF_ACCOUNT_ID="your-cloudflare-account-id"
 
@@ -190,8 +350,8 @@ export CF_ACCOUNT_ID="your-cloudflare-account-id"
 gendoc-template/scripts/deploy.sh
 ```
 
-The script generates `wrangler.toml` from a template, deploys the built site to Cloudflare
-Pages, and prints the deployed URL (typically `https://<project-name>.pages.dev`).
+The script deploys the built site to Cloudflare Pages and prints the deployed URL
+(typically `https://<project-name>.pages.dev`).
 
 ## Host Project .gitignore
 
@@ -206,13 +366,15 @@ doxygen-output/
 ```
 
 The `gendoc.yml` file itself **should** be committed to your host project -- it is your
-project's configuration.
+project's configuration.  Likewise `llms-meta.json` and `llms-corpus/` are source, not
+artifacts -- commit them.
 
 ## Directory Layout
 
 ```
 your-project/                   # HOST PROJECT ROOT
 ├── gendoc.yml                  # Your project's configuration (YOU CREATE THIS)
+├── llms-meta.json              # Agent catalog editorial metadata (generated by build-llms.py)
 ├── docs/                       # Example hand-written docs directory
 │   ├── SUMMARY.md              # Hand-written navigation (YOU CREATE THIS)
 │   ├── introduction.md
@@ -220,17 +382,33 @@ your-project/                   # HOST PROJECT ROOT
 │   └── guides/
 ├── src/                        # Your C++ source (for Doxygen)
 ├── gendoc-template/            # Git submodule (read-only, versioned separately)
+│   ├── .claude/
+│   │   └── commands/
+│   │       └── update-catalogs.md  # Claude Code command for editorial pass
+│   ├── ask-ai/                 # Ask AI widget + worker (see Ask AI Widget)
+│   │   ├── widget-src/         # TypeScript widget source
+│   │   ├── worker/ask.js           # Cloudflare Worker (/api/ask)
+│   │   ├── worker/search-normalizer.js  # SymSpell-based spelling correction
+│   │   └── wrangler-ask.toml.template  # Worker config template
 │   ├── gendoc.yml.example      # Config template -- copy to host root
+│   ├── index.md.template        # Sample template for generate-index.sh
 │   ├── mkdocs.yml              # MkDocs config with Material theme
 │   ├── requirements.txt        # Python dependencies
+│   ├── wrangler.toml.template  # Pages config template
 │   ├── scripts/
+│   │   ├── setup.sh            # One-time Cloudflare setup (Pages + ask worker)
 │   │   ├── build.sh            # Full build pipeline
-│   │   ├── build_api_reference.sh  # Doxygen + doxybook2
-│   │   ├── build_navigation.py     # Nav merging
+│   │   ├── build-source-reference.sh  # Doxygen + doxybook2
+│   │   ├── build-llms.py       # llms.txt catalog generator
+│   │   ├── build-navigation.py     # Nav merging
+│   │   ├── build-widget.sh     # Ask widget TypeScript compilation
 │   │   ├── deploy.sh           # Cloudflare Pages deploy
-│   │   └── load_gendoc_config.py   # MkDocs hook
-│   ├── stylesheets/            # GNUS brand CSS
-│   ├── javascripts/            # Theme enhancements
+│   │   ├── deploy-ask.sh       # Ask worker standalone deploy
+│   │   ├── generate-index.sh   # index.md regeneration from headings
+│   │   ├── read-yaml.py        # YAML config reader
+│   │   └── load-gendoc-config.py   # MkDocs hook
+│   ├── stylesheets/            # theme.css (MkDocs + Ask drawer theme)
+│   ├── javascripts/            # Theme enhancements (+ generated ask/ output, gitignored)
 │   ├── doxygen-template/       # Doxygen config template
 │   └── README.md
 ├── site/                       # Built site output (gitignored)
@@ -250,6 +428,14 @@ your-project/                   # HOST PROJECT ROOT
 | `Error: CF_API_TOKEN environment variable is not set` | Missing deploy credentials | `export CF_API_TOKEN="your-token"` and `export CF_ACCOUNT_ID="your-account-id"` |
 | `Warning: gendoc.yml not found` (during mkdocs serve) | The MkDocs hook looks for gendoc.yml at the host root and falls back to defaults if missing | Create `gendoc.yml` at the host project root, or edit `mkdocs.yml` directly if you prefer |
 | `No SUMMARY.md found` (warning) | Hand-written docs directory has no `SUMMARY.md` | Create `SUMMARY.md` in your hand-written docs directory (see [Hand-Written Docs](#hand-written-docs)) |
+| `22 entries need editorial attention` (catalog) | `llms-meta.json` has un-reviewed entries | Run `/update-catalogs` in Claude Code to fill in descriptions and categories |
+| `Neither SUMMARY.md nor SUMMARY_EXT.md found` (catalog) | `build-llms.py` cannot find the navigation file | Verify `paths.handwritten_docs` in `gendoc.yml` points at the correct directory |
+| `WARNING: SUMMARY.md links missing file` (catalog) | A document listed in SUMMARY.md does not exist on disk | Check for broken links or moved files in your SUMMARY.md |
+| `could not determine executable to run` (widget build) | npx invoked with the package name as the command | `build-widget.sh` must use `npx -y -p typescript@5 tsc ...` (`--package` form) |
+| `Cannot use import statement outside a module` (browser console) | Widget script loaded as a classic script | The mkdocs.yml entry needs the object form with `type: module` (see mkdocs.yml) |
+| Ask button never appears | `ask-config.json` missing from the site | Set `llms.ask.enabled: true`, run `setup.sh` to deploy the worker and capture the endpoint, then re-run `build.sh` + `deploy.sh` |
+| Ask answers fail with a CORS error | Site origin not allowed by the worker | Add the origin to `llms.ask.allowed_origins` and re-run `setup.sh` |
+| "The assistant is temporarily over capacity" | No provider secrets set, or daily quotas exhausted | Set `GEMINI_API_KEY` / `OPENROUTER_API_KEY` via `setup.sh` or `wrangler secret put`, or wait for quota reset |
 
 ## License
 

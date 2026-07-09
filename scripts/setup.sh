@@ -7,6 +7,17 @@ TEMPLATE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 HOST_ROOT="$(cd "$TEMPLATE_ROOT/.." && pwd)"
 GENDOC_YML="$HOST_ROOT/gendoc.yml"
 
+# ── Python virtual environment ────────────────────────────────────────────────
+VENV="$TEMPLATE_ROOT/.venv"
+if [ ! -d "$VENV" ]; then
+    echo "Creating Python virtual environment at $VENV ..."
+    python3 -m venv "$VENV"
+fi
+export PATH="$VENV/bin:$PATH"
+
+# Install/refresh required packages.
+pip install --quiet mkdocs mkdocs-material mkdocs-literate-nav pyyaml
+
 if [ ! -f "$GENDOC_YML" ]; then
     echo "Error: gendoc.yml not found at $GENDOC_YML" >&2
     echo "       Create one by copying gendoc-template/gendoc.yml.example and filling in your project values." >&2
@@ -35,25 +46,12 @@ fi
 echo "Reading gendoc.yml..."
 
 read_yaml() {
-    python3 -c "import yaml, sys
-with open(sys.argv[1], 'r') as f:
-    cfg = yaml.safe_load(f)
-value = cfg
-for key in sys.argv[2].split('.'):
-    if isinstance(value, dict) and key in value:
-        value = value[key]
-    elif isinstance(value, list):
-        try:
-            idx = int(key)
-            value = value[idx]
-        except (ValueError, IndexError):
-            print('', end='')
-            sys.exit(0)
-    else:
-        print('', end='')
-        sys.exit(0)
-print(str(value) if value is not None else '', end='')
-" "$GENDOC_YML" "$1"
+    python3 "$SCRIPT_DIR/read-yaml.py" "$GENDOC_YML" "$1"
+}
+
+# Like read_yaml, but joins a YAML list into a comma-separated string.
+read_yaml_list() {
+    python3 "$SCRIPT_DIR/read-yaml.py" "$GENDOC_YML" "$1" --join
 }
 
 PROJECT_NAME=$(read_yaml "project.name")
@@ -125,6 +123,128 @@ with open(sys.argv[5], 'w') as f:
 
 echo "  wrangler.toml written to $WRANGLER_OUT"
 
+# ── Ask widget worker (optional) ─────────────────────────────────────────────
+LLMS_ENABLED=$(read_yaml "llms.enabled")
+ASK_ENABLED=$(read_yaml "llms.ask.enabled")
+ASK_WORKER_NAME=""
+
+if [ "$LLMS_ENABLED" = "true" ] && [ "$ASK_ENABLED" = "true" ]; then
+    LLMS_SITE_URL=$(read_yaml "llms.site_url")
+    if [ -z "$LLMS_SITE_URL" ]; then
+        echo "Error: llms.site_url is required when llms.ask.enabled is true" >&2
+        exit 1
+    fi
+    LLMS_SITE_URL="${LLMS_SITE_URL%/}"
+
+    ASK_WORKER_NAME=$(read_yaml "llms.ask.worker_name")
+    ASK_WORKER_NAME="${ASK_WORKER_NAME:-${PAGES_PROJECT_NAME}-ask}"
+    ASK_BOT_NAME=$(read_yaml "llms.ask.title")
+    ASK_BOT_NAME="${ASK_BOT_NAME:-${PROJECT_NAME:-Docs} Assistant}"
+    ASK_ORIGINS=$(read_yaml_list "llms.ask.allowed_origins")
+    ASK_ORIGINS="${ASK_ORIGINS:-$LLMS_SITE_URL}"
+    ASK_PROVIDERS=$(read_yaml "llms.ask.providers")
+    ASK_PROVIDERS="${ASK_PROVIDERS:-openrouter,gemini}"
+    ASK_GEMINI_MODEL=$(read_yaml "llms.ask.gemini_model")
+    ASK_GEMINI_MODEL="${ASK_GEMINI_MODEL:-gemini-2.5-flash}"
+    ASK_OPENROUTER_MODELS=$(read_yaml "llms.ask.openrouter_models")
+    ASK_OPENROUTER_MODELS="${ASK_OPENROUTER_MODELS:-nvidia/nemotron-3-super-120b-a12b:free,nvidia/nemotron-3-ultra-550b-a55b:free,nvidia/nemotron-3-nano-30b-a3b:free}"
+
+    ASK_TPL="$TEMPLATE_ROOT/ask-ai/wrangler-ask.toml.template"
+    ASK_OUT="$TEMPLATE_ROOT/ask-ai/wrangler-ask.toml"
+
+    echo ""
+    echo "Generating ask-ai/wrangler-ask.toml from template..."
+
+    # Read configured endpoint for route injection (shared-worker scenario).
+    ASK_ENDPOINT_CFG=$(read_yaml "llms.ask.endpoint")
+
+    python3 -c "
+import sys
+from urllib.parse import urlparse
+
+with open(sys.argv[1], 'r') as f:
+    content = f.read()
+tokens = {
+    '{{WORKER_NAME}}': sys.argv[2],
+    '{{COMPATIBILITY_DATE}}': sys.argv[3],
+    '{{LLMS_URL}}': sys.argv[4] + '/llms.txt',
+    '{{SITE_URL}}': sys.argv[4],
+    '{{ALLOWED_ORIGINS}}': sys.argv[5],
+    '{{BOT_NAME}}': sys.argv[6],
+    '{{PROVIDERS}}': sys.argv[7],
+    '{{GEMINI_MODEL}}': sys.argv[8],
+    '{{OPENROUTER_MODELS}}': sys.argv[9],
+}
+for token, value in tokens.items():
+    content = content.replace(token, value)
+
+# When a custom endpoint is configured, append a [[routes]] section so
+# traffic to that domain+path reaches this worker.
+endpoint = sys.argv[11]
+if endpoint:
+    parsed = urlparse(endpoint)
+    host = parsed.hostname or ''
+    path = parsed.path.rstrip('/') or '/api/ask'
+    route_path = '/'.join(path.split('/')[:-1] + ['*'])
+    zone = '.'.join(host.split('.')[-2:])
+    content += f'\n[[routes]]\npattern = \"{host}{route_path}\"\nzone_name = \"{zone}\"\n'
+
+with open(sys.argv[10], 'w') as f:
+    f.write(content)
+" "$ASK_TPL" "$ASK_WORKER_NAME" "$COMPATIBILITY_DATE" "$LLMS_SITE_URL" \
+      "$ASK_ORIGINS" "$ASK_BOT_NAME" "$ASK_PROVIDERS" "$ASK_GEMINI_MODEL" \
+      "$ASK_OPENROUTER_MODELS" "$ASK_OUT" "$ASK_ENDPOINT_CFG"
+
+    echo "  wrangler-ask.toml written to $ASK_OUT"
+
+    echo ""
+    echo "Deploying ask worker '$ASK_WORKER_NAME' (re-running syncs config changes)..."
+    echo ""
+    wrangler deploy --config "$ASK_OUT" 2>&1 | tee /tmp/ask-deploy.log
+    DEPLOY_OUTPUT=$(cat /tmp/ask-deploy.log)
+
+    # Resolve the endpoint so build-widget.sh can generate ask-config.json.
+    # Precedence: configured llms.ask.endpoint (shared-worker / custom-domain
+    # scenario), otherwise auto-capture the workers.dev URL from deploy output.
+    CONFIGURED_ENDPOINT=$(read_yaml "llms.ask.endpoint")
+    ENDPOINT_FILE="$TEMPLATE_ROOT/ask-ai/.endpoint"
+    if [ -n "$CONFIGURED_ENDPOINT" ]; then
+        echo "$CONFIGURED_ENDPOINT" > "$ENDPOINT_FILE"
+        echo "  Endpoint (from gendoc.yml): $CONFIGURED_ENDPOINT"
+    else
+        AUTO_URL=$(echo "$DEPLOY_OUTPUT" | grep -oE 'https://[a-zA-Z0-9._-]+\.workers\.dev' | head -1)
+        if [ -n "$AUTO_URL" ]; then
+            echo "${AUTO_URL}/api/ask" > "$ENDPOINT_FILE"
+            echo "  Endpoint captured to $ENDPOINT_FILE"
+        else
+            echo "  WARNING: Could not auto-detect worker URL from deploy output."
+            echo "  Set llms.ask.endpoint in gendoc.yml, or create"
+            echo "  ask-ai/.endpoint manually with the worker URL + /api/ask."
+        fi
+    fi
+
+    # ── Provider secrets (interactive, skippable, set once) ──────────────────
+    if [ -t 0 ]; then
+        echo ""
+        echo "Provider API keys are stored as Worker secrets (press Enter to skip"
+        echo "either one — a provider without a key is skipped in the chain)."
+        read -r -s -p "  Gemini API key: " GEMINI_KEY; echo ""
+        if [ -n "$GEMINI_KEY" ]; then
+            printf '%s' "$GEMINI_KEY" | wrangler secret put GEMINI_API_KEY --name "$ASK_WORKER_NAME"
+        fi
+        read -r -s -p "  OpenRouter API key: " OPENROUTER_KEY; echo ""
+        if [ -n "$OPENROUTER_KEY" ]; then
+            printf '%s' "$OPENROUTER_KEY" | wrangler secret put OPENROUTER_API_KEY --name "$ASK_WORKER_NAME"
+        fi
+        unset GEMINI_KEY OPENROUTER_KEY
+    else
+        echo ""
+        echo "  Non-interactive shell — set secrets manually (once):"
+        echo "    wrangler secret put GEMINI_API_KEY     --name $ASK_WORKER_NAME"
+        echo "    wrangler secret put OPENROUTER_API_KEY --name $ASK_WORKER_NAME"
+    fi
+fi
+
 # ── Done ─────────────────────────────────────────────────────────────────────
 echo ""
 echo "=============================================="
@@ -133,6 +253,9 @@ echo "  Project:   $PAGES_PROJECT_NAME"
 echo "  Pages URL: https://$PAGES_PROJECT_NAME.pages.dev"
 if [ -n "$CUSTOM_DOMAIN" ]; then
     echo "  Custom:    https://$CUSTOM_DOMAIN"
+fi
+if [ -n "$ASK_WORKER_NAME" ]; then
+    echo "  Ask worker: $ASK_WORKER_NAME (endpoint captured to ask-ai/.endpoint)"
 fi
 echo ""
 echo "  Next: gendoc-template/scripts/build.sh"

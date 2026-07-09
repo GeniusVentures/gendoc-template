@@ -1,0 +1,24 @@
+# Wrangler configuration for the ask widget's Worker (/api/ask)
+# Generated from wrangler-ask.toml.template -- {{TOKENS}} are substituted
+# from gendoc.yml values by scripts/setup.sh. Do not edit the generated
+# file; edit gendoc.yml.
+#
+# This is a WORKER, deployed separately from the Pages site:
+#   gendoc-template/scripts/setup.sh
+# Secrets are set once, manually (never in any config file):
+#   wrangler secret put GEMINI_API_KEY     --name {{WORKER_NAME}}
+#   wrangler secret put OPENROUTER_API_KEY --name {{WORKER_NAME}}
+# Either provider may be omitted (no key = skipped in the chain).
+
+name = "{{WORKER_NAME}}"
+main = "worker/ask.js"
+compatibility_date = "{{COMPATIBILITY_DATE}}"
+
+[vars]
+LLMS_URL = "{{LLMS_URL}}"
+ALLOWED_ORIGINS = "{{ALLOWED_ORIGINS}}"
+SITE_URL = "{{SITE_URL}}"
+BOT_NAME = "{{BOT_NAME}}"
+PROVIDERS = "{{PROVIDERS}}"
+GEMINI_MODEL = "{{GEMINI_MODEL}}"
+OPENROUTER_MODELS = "{{OPENROUTER_MODELS}}"

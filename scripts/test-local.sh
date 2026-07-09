@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# test-local.sh -- run the ask worker and static site locally for development.
+#
+# Step 1 (one-time, manual): create ask-ai/.dev.vars with your API keys:
+#   cat > gendoc-template/ask-ai/.dev.vars <<'EOF'
+#   GEMINI_API_KEY=your-gemini-key-here
+#   OPENROUTER_API_KEY=your-openrouter-key-here
+#   EOF
+#
+# Then just run this script from the project root.  Press Ctrl-C to stop
+# everything and the site's ask-config.json will be restored automatically.
+#
+#   gendoc-template/scripts/test-local.sh
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TEMPLATE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+HOST_ROOT="$(cd "$TEMPLATE_ROOT/.." && pwd)"
+
+# ── Activate Python virtual environment ────────────────────────────────────────
+VENV="$TEMPLATE_ROOT/.venv"
+if [ -d "$VENV" ]; then
+    export PATH="$VENV/bin:$PATH"
+fi
+SITE_DIR="$TEMPLATE_ROOT/site"
+# If the build output ended up in the host root (pre-build.sh fix), use that.
+HOST_SITE="$HOST_ROOT/site"
+if [ -f "$HOST_SITE/index.html" ] && [ ! -f "$SITE_DIR/index.html" ]; then
+    SITE_DIR="$HOST_SITE"
+fi
+CONFIG_FILE="$SITE_DIR/ask-config.json"
+WORKER_DIR="$TEMPLATE_ROOT/ask-ai"
+WRANGLER_CONFIG="$WORKER_DIR/wrangler-ask.toml"
+DEV_VARS="$WORKER_DIR/.dev.vars"
+
+WORKER_PORT="${ASK_LOCAL_PORT:-8787}"
+SITE_PORT="${ASK_SITE_PORT:-8000}"
+WORKER_URL="http://localhost:$WORKER_PORT/api/ask?debug=true"
+SITE_URL="http://localhost:$SITE_PORT"
+
+PID_WRANGLER=""
+PID_SERVER=""
+
+# ── helpers ──────────────────────────────────────────────────────────────────
+free_port() {
+    # Kill whatever is listening on $1 so we can bind to it.
+    local pid
+    pid=$(lsof -ti ":$1" 2>/dev/null || true)
+    if [ -n "$pid" ]; then
+        echo "Killing stale process on port $1 (pid $pid)..."
+        kill $pid 2>/dev/null || true
+        sleep 1
+    fi
+}
+
+# ── cleanup ──────────────────────────────────────────────────────────────────
+cleanup() {
+    echo ""
+    echo "Shutting down..."
+    # Kill tracked PIDs and their children first.
+    [ -n "$PID_SERVER" ]   && kill "$PID_SERVER"   2>/dev/null || true
+    [ -n "$PID_WRANGLER" ] && kill "$PID_WRANGLER" 2>/dev/null || true
+    sleep 1
+    # Force-kill anything still holding the ports (catches child processes).
+    lsof -ti ":$SITE_PORT"   2>/dev/null | xargs kill -9 2>/dev/null || true
+    lsof -ti ":$WORKER_PORT" 2>/dev/null | xargs kill -9 2>/dev/null || true
+    wait 2>/dev/null || true
+
+    if [ -f "$CONFIG_FILE.bak" ]; then
+        mv "$CONFIG_FILE.bak" "$CONFIG_FILE"
+        echo "Restored $CONFIG_FILE"
+    fi
+    echo "Done."
+}
+trap cleanup EXIT INT TERM
+
+# ── prerequisites ────────────────────────────────────────────────────────────
+command -v wrangler >/dev/null 2>&1 || { echo "ERROR: wrangler not found (npm install -g wrangler)" >&2; exit 1; }
+command -v python3  >/dev/null 2>&1 || { echo "ERROR: python3 not found" >&2; exit 1; }
+
+if [ ! -f "$WRANGLER_CONFIG" ]; then
+    echo "ERROR: $WRANGLER_CONFIG not found -- run setup.sh first" >&2
+    exit 1
+fi
+# ask-config.json may be in the other site dir if the build split.
+if [ ! -f "$CONFIG_FILE" ]; then
+    if [ -f "$TEMPLATE_ROOT/site/ask-config.json" ]; then
+        cp "$TEMPLATE_ROOT/site/ask-config.json" "$CONFIG_FILE"
+        echo "Copied ask-config.json from template site dir."
+    else
+        echo "ERROR: $CONFIG_FILE not found -- run build.sh first" >&2
+        exit 1
+    fi
+fi
+if [ ! -f "$DEV_VARS" ]; then
+    echo "WARNING: $DEV_VARS not found — worker won't have API keys."
+    echo "         Create it with your GEMINI_API_KEY and OPENROUTER_API_KEY"
+    echo "         (see comments at the top of this script)."
+    echo ""
+fi
+
+# ── patch ask-config.json → local worker ─────────────────────────────────────
+cp "$CONFIG_FILE" "$CONFIG_FILE.bak"
+python3 -c "
+import json, sys
+with open(sys.argv[1], 'r') as f:
+    cfg = json.load(f)
+cfg['endpoint'] = sys.argv[2]
+with open(sys.argv[1], 'w') as f:
+    json.dump(cfg, f, indent=2)
+    f.write('\n')
+" "$CONFIG_FILE" "$WORKER_URL"
+echo "Patched ask-config.json endpoint → $WORKER_URL"
+
+# ── start wrangler dev (background) ───────────────────────────────────────────
+echo ""
+echo "Starting local worker on $WORKER_URL ..."
+free_port "$WORKER_PORT"
+cd "$WORKER_DIR" && wrangler dev \
+    --config "$WRANGLER_CONFIG" \
+    --var "ALLOWED_ORIGINS:$SITE_URL,$WORKER_URL" \
+    --var "LLMS_URL:$SITE_URL/llms.txt" \
+    --var "SITE_URL:$SITE_URL" \
+    --port "$WORKER_PORT" \
+    > /tmp/ask-worker.log 2>&1 &
+PID_WRANGLER=$!
+
+# Wait for wrangler to be ready.
+for i in $(seq 1 30); do
+    if curl -s -o /dev/null "http://localhost:$WORKER_PORT/api/ask" 2>/dev/null; then
+        # 404 on GET is fine — means the worker is listening
+        echo "Worker ready (pid $PID_WRANGLER)"
+        break
+    fi
+    if [ "$i" -eq 30 ]; then
+        echo "ERROR: worker failed to start after 30s. Log:"
+        tail -20 /tmp/ask-worker.log
+        exit 1
+    fi
+    sleep 1
+done
+
+# ── start static server (foreground) ─────────────────────────────────────────
+echo ""
+echo "Serving site at $SITE_URL"
+echo "Press Ctrl-C to stop everything and restore ask-config.json."
+echo "------------------------------------------------------------"
+free_port "$SITE_PORT"
+cd "$SITE_DIR" && python3 -m http.server "$SITE_PORT" &
+PID_SERVER=$!
+
+wait

@@ -7,6 +7,12 @@ TEMPLATE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 HOST_ROOT="$(cd "$TEMPLATE_ROOT/.." && pwd)"
 GENDOC_YML="$HOST_ROOT/gendoc.yml"
 
+# ── Activate Python virtual environment ────────────────────────────────────────
+VENV="$TEMPLATE_ROOT/.venv"
+if [ -d "$VENV" ]; then
+    export PATH="$VENV/bin:$PATH"
+fi
+
 # ── Validate prerequisites ────────────────────────────────────────────────────
 if [ ! -f "$GENDOC_YML" ]; then
     echo "Error: gendoc.yml not found at $GENDOC_YML" >&2
@@ -34,7 +40,7 @@ fi
 
 if ! command -v doxybook2 &>/dev/null; then
     echo "Error: doxybook2 not found." >&2
-    echo "       Run:   bash gendoc-template/scripts/install_deps.sh" >&2
+    echo "       Run:   bash gendoc-template/scripts/install-deps.sh" >&2
     echo "       Or download manually from:" >&2
     echo "       https://github.com/GeniusVentures/doxybook2/releases/tag/v1.6.3" >&2
     exit 1
@@ -49,32 +55,7 @@ fi
 echo "Reading gendoc.yml..."
 
 read_yaml() {
-    python3 -c "import yaml, sys
-with open(sys.argv[1], 'r') as f:
-    cfg = yaml.safe_load(f)
-value = cfg
-for key in sys.argv[2].split('.'):
-    if isinstance(value, dict) and key in value:
-        value = value[key]
-    elif isinstance(value, list):
-        try:
-            idx = int(key)
-            value = value[idx]
-        except (ValueError, IndexError):
-            print('', end='')
-            sys.exit(0)
-    else:
-        print('', end='')
-        sys.exit(0)
-if isinstance(value, bool):
-    print('true' if value else 'false', end='')
-elif isinstance(value, list):
-    print(' '.join(str(v) for v in value), end='')
-elif value is None:
-    print('', end='')
-else:
-    print(str(value), end='')
-" "$GENDOC_YML" "$1"
+    python3 "$SCRIPT_DIR/read-yaml.py" "$GENDOC_YML" "$1"
 }
 
 PROJECT_NAME=$(read_yaml "project.name")
@@ -82,7 +63,7 @@ PROJECT_NUMBER=$(read_yaml "project.number")
 PROJECT_BRIEF=$(read_yaml "project.brief")
 PROJECT_LOGO=$(read_yaml "project.logo")
 HANDWRITTEN_DOCS=$(read_yaml "paths.handwritten_docs")
-EXCLUDE_PATTERNS_RAW=$(read_yaml "paths.exclude_patterns")
+EXCLUDE_PATTERNS_RAW=$(read_yaml "paths.exclude_patterns" --join-space)
 DOXY_OUTPUT_DIR=$(read_yaml "doxygen.output_dir")
 GENERATE_XML_RAW=$(read_yaml "doxygen.generate_xml")
 GENERATE_HTML_RAW=$(read_yaml "doxygen.generate_html")
@@ -283,9 +264,9 @@ done <<< "$MANIFEST"
 # ── Run navigation builder (handles all sets from gendoc.yml) ─────────────────
 echo ""
 echo "Running navigation builder..."
-NAV_SCRIPT="$SCRIPT_DIR/build_navigation.py"
+NAV_SCRIPT="$SCRIPT_DIR/build-navigation.py"
 if [ ! -f "$NAV_SCRIPT" ]; then
-    echo "Warning: build_navigation.py not found at $NAV_SCRIPT — skipping navigation generation" >&2
+    echo "Warning: build-navigation.py not found at $NAV_SCRIPT — skipping navigation generation" >&2
 else
     python3 "$NAV_SCRIPT" --docs-dir "$HANDWRITTEN_DOCS_ABS" --gendoc-config "$GENDOC_YML"
 fi

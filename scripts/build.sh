@@ -7,6 +7,13 @@ TEMPLATE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 HOST_ROOT="$(cd "$TEMPLATE_ROOT/.." && pwd)"
 GENDOC_YML="$HOST_ROOT/gendoc.yml"
 
+# ── Activate Python virtual environment ────────────────────────────────────────
+VENV="$TEMPLATE_ROOT/.venv"
+if [ -d "$VENV" ]; then
+    export PATH="$VENV/bin:$PATH"
+    echo "Using venv: $VENV"
+fi
+
 # ── Validate prerequisites ────────────────────────────────────────────────────
 if [ ! -f "$GENDOC_YML" ]; then
     echo "Error: gendoc.yml not found at $GENDOC_YML" >&2
@@ -14,9 +21,9 @@ if [ ! -f "$GENDOC_YML" ]; then
     exit 1
 fi
 
-BUILD_SOURCE_REFERENCE_SCRIPT="$TEMPLATE_ROOT/scripts/build_source_reference.sh"
+BUILD_SOURCE_REFERENCE_SCRIPT="$TEMPLATE_ROOT/scripts/build-source-reference.sh"
 if [ ! -f "$BUILD_SOURCE_REFERENCE_SCRIPT" ]; then
-    echo "Error: build_source_reference.sh not found at $BUILD_SOURCE_REFERENCE_SCRIPT" >&2
+    echo "Error: build-source-reference.sh not found at $BUILD_SOURCE_REFERENCE_SCRIPT" >&2
     exit 1
 fi
 
@@ -28,7 +35,8 @@ fi
 
 if ! command -v mkdocs &>/dev/null; then
     echo "Error: mkdocs not found." >&2
-    echo "       Install with: pip install mkdocs mkdocs-material mkdocs-literate-nav" >&2
+    echo "       Create a .venv with: python3 -m venv .venv && source .venv/bin/activate" >&2
+    echo "       Then: pip install mkdocs mkdocs-material mkdocs-literate-nav" >&2
     exit 1
 fi
 
@@ -41,32 +49,7 @@ fi
 echo "Reading gendoc.yml..."
 
 read_yaml() {
-    python3 -c "import yaml, sys
-with open(sys.argv[1], 'r') as f:
-    cfg = yaml.safe_load(f)
-value = cfg
-for key in sys.argv[2].split('.'):
-    if isinstance(value, dict) and key in value:
-        value = value[key]
-    elif isinstance(value, list):
-        try:
-            idx = int(key)
-            value = value[idx]
-        except (ValueError, IndexError):
-            print('', end='')
-            sys.exit(0)
-    else:
-        print('', end='')
-        sys.exit(0)
-if isinstance(value, bool):
-    print('true' if value else 'false', end='')
-elif isinstance(value, list):
-    print(' '.join(str(v) for v in value), end='')
-elif value is None:
-    print('', end='')
-else:
-    print(str(value), end='')
-" "$GENDOC_YML" "$1"
+    python3 "$SCRIPT_DIR/read-yaml.py" "$GENDOC_YML" "$1"
 }
 
 SITE_DIR=$(read_yaml "mkdocs.site_dir")
@@ -93,40 +76,59 @@ if bash "$BUILD_SOURCE_REFERENCE_SCRIPT"; then
     echo "  Source reference build completed successfully"
 else
     exit_code=$?
-    echo "Error: build_source_reference.sh failed with exit code $exit_code" >&2
+    echo "Error: build-source-reference.sh failed with exit code $exit_code" >&2
     exit $exit_code
 fi
 
 # ── Step 2: Regenerate index.md (from hand-written doc headings) ─────────────
+GENERATE_INDEX=$(read_yaml "navigation.generate_index")
 HANDWRITTEN_DOCS=$(read_yaml "paths.handwritten_docs")
-INDEX_SCRIPT="$HOST_ROOT/$HANDWRITTEN_DOCS/generate-index.sh"
+INDEX_SCRIPT="$SCRIPT_DIR/generate-index.sh"
+HANDWRITTEN_DOCS_ABS="$HOST_ROOT/$HANDWRITTEN_DOCS"
 echo ""
 echo "=============================================="
 echo "  Step 2: Regenerating index.md"
 echo "=============================================="
-if [ -f "$INDEX_SCRIPT" ]; then
-    bash "$INDEX_SCRIPT"
-    echo "  index.md regenerated from $HANDWRITTEN_DOCS/index.md.template"
-else
+if [ "$GENERATE_INDEX" != "true" ]; then
+    echo "  Skipped — navigation.generate_index is not true"
+elif [ ! -f "$INDEX_SCRIPT" ]; then
     echo "  Skipped — generate-index.sh not found at $INDEX_SCRIPT"
+elif [ ! -f "$HANDWRITTEN_DOCS_ABS/index.md.template" ]; then
+    echo "  Skipped — index.md.template not found in $HANDWRITTEN_DOCS"
+else
+    bash "$INDEX_SCRIPT" "$HANDWRITTEN_DOCS_ABS"
+    echo "  index.md regenerated from $HANDWRITTEN_DOCS/index.md.template"
 fi
 
-# ── Step 3: Build MkDocs site ─────────────────────────────────────────────────
+# ── Step 3: Build ask widget ─────────────────────────────────────────────────
 echo ""
 echo "=============================================="
-echo "  Step 3: Building MkDocs site"
+echo "  Step 3:  Building ask widget"
+echo "=============================================="
+"$SCRIPT_DIR/build-widget.sh"
+
+# ── Step 4: Build MkDocs site ─────────────────────────────────────────────────
+echo ""
+echo "=============================================="
+echo "  Step 4: Building MkDocs site"
 echo "=============================================="
 
 SITE_DIR_ABS="$TEMPLATE_ROOT/$SITE_DIR"
 echo "  Output directory: $SITE_DIR_ABS"
 
-if mkdocs build -f "$MKDOCS_YML" --site-dir "$SITE_DIR" $STRICT_FLAG; then
+if mkdocs build -f "$MKDOCS_YML" --site-dir "$SITE_DIR_ABS" $STRICT_FLAG; then
     echo "  MkDocs build completed successfully"
 else
     exit_code=$?
     echo "Error: mkdocs build failed with exit code $exit_code" >&2
     exit $exit_code
 fi
+
+echo ""
+echo "=============================================="
+echo "  Step 5: Generating llms.txt agent catalogs"
+echo "=============================================="
+python3 "$SCRIPT_DIR/build-llms.py" "$@"
 
 # ── Success ───────────────────────────────────────────────────────────────────
 echo ""

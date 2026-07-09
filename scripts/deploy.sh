@@ -8,6 +8,12 @@ HOST_ROOT="$(cd "$TEMPLATE_ROOT/.." && pwd)"
 GENDOC_YML="$HOST_ROOT/gendoc.yml"
 WRANGLER_TOML="$TEMPLATE_ROOT/wrangler.toml"
 
+# ── Activate Python virtual environment ────────────────────────────────────────
+VENV="$TEMPLATE_ROOT/.venv"
+if [ -d "$VENV" ]; then
+    export PATH="$VENV/bin:$PATH"
+fi
+
 # ── Validate prerequisites ───────────────────────────────────────────────────
 if [ ! -f "$GENDOC_YML" ]; then
     echo "Error: gendoc.yml not found at $GENDOC_YML" >&2

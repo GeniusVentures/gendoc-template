@@ -1,5 +1,5 @@
 """
-copy_assets.py
+copy-assets.py
 
 MkDocs hook that copies the template's ``javascripts/`` and ``stylesheets/``
 into the built site directory.
@@ -20,7 +20,7 @@ resolution is fixed in either case from a single place.
 Registered in mkdocs.yml via:
 
     hooks:
-      - scripts/copy_assets.py
+      - scripts/copy-assets.py
 """
 
 import os

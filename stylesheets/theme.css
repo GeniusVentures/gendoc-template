@@ -1,8 +1,8 @@
 /*
- * extra.css
+ * theme.css
  *
- * GNUS.AI brand colors and GitBook compatibility overrides for MkDocs Material.
- * All colors defined as CSS custom properties — single source of truth.
+ * Single theme file for MkDocs Material + Ask AI Drawer.
+ * Override any CSS variable below to match your brand.
  * Brand palette: #0096c7 → #00b4d8 → #48cae4 → #90e0ef (cyan-blue ramp)
  */
 
@@ -233,4 +233,43 @@
 .md-typeset div[data-full-width="true"]   { width:100%; text-align:left; }
 .md-typeset div[data-full-width="true"] figure { display:block; width:100%; margin:1rem 0; }
 .md-typeset div[data-full-width="true"] img:not([width]) { width:100%; max-width:100%; display:block; }
+
+/* ── Ask AI Drawer theme variables ──────────────────────────────────────────
+ * The drawer inherits these from the light DOM via shadow DOM custom
+ * property inheritance.  Override any variable here to match your brand.
+ */
+:root {
+  --ask-accent: #0096c7;
+  --ask-drawer-bg: #fff;
+  --ask-drawer-fg: #16232e;
+  --ask-drawer-border: #d6dde3;
+  --ask-msg-bg: #f1f4f7;
+  --ask-msg-border: #e2e8ee;
+  --ask-code-bg: #e6ebf1;
+  --ask-input-bg: #fff;
+  --ask-input-border: #d6dde3;
+  --ask-thinking-bg: #f4f6f8;
+  --ask-session-bg: #f8f9fb;
+  --ask-session-border: #e2e8ee;
+  --ask-session-item-border: #eef1f5;
+  --ask-session-active: #e8ecf1;
+  --ask-session-hover: #eef1f5;
+  --ask-muted-fg: #5c6b78;
+  --ask-danger: #cc6666;
+
+  --ask-dark-bg: #1a2129;
+  --ask-dark-fg: #dbe4ec;
+  --ask-dark-border: #2c3944;
+  --ask-dark-msg-bg: #232d38;
+  --ask-dark-session-bg: #19212b;
+  --ask-dark-session-item-border: #1e2732;
+  --ask-dark-muted-fg: #8fa1b0;
+}
+
+/* ── Content bottom margin ───────────────────────────────────────────────── */
+.md-content__inner { padding-bottom: 4rem; }
+
+.md-logo img {
+  filter: brightness(.5) saturate(20);
+}
 

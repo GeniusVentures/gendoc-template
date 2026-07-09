@@ -41,7 +41,7 @@ jobs:
 
       # ── doxybook2 ─────────────────────────────────────────────────────────
       - name: Install doxybook2
-        run: bash gendoc-template/scripts/install_deps.sh
+        run: bash gendoc-template/scripts/install-deps.sh
 
       # ── Generate wrangler.toml ────────────────────────────────────────────
       - name: Generate wrangler.toml

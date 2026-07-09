@@ -35,3 +35,8 @@ wrangler.toml
 
 # Generated API reference markdown (produced by doxybook2)
 **/generated-api/**
+
+# Generated ask-ai files (produced by setup.sh / deploy-ask.sh)
+ask-ai/wrangler-ask.toml
+ask-ai/.endpoint
+ask-ai/.dev.vars

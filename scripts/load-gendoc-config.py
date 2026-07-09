@@ -1,5 +1,5 @@
 """
-load_gendoc_config.py
+load-gendoc-config.py
 
 MkDocs hook that reads gendoc.yml at startup and applies project-specific
 configuration to the mkdocs config dict.  This keeps the template entirely
@@ -9,11 +9,12 @@ site_dir through its gendoc.yml file.
 Registered in mkdocs.yml via:
 
     hooks:
-      - scripts/load_gendoc_config.py
+      - scripts/load-gendoc-config.py
 """
 
 import logging
 import os
+import shutil
 
 import yaml
 
@@ -78,6 +79,23 @@ def on_config(config):
         abs_docs = os.path.abspath(abs_docs)
         config["docs_dir"] = abs_docs
         logger.info("load_gendoc_config: docs_dir = %s", abs_docs)
+
+    # ── Generator (hide "Made with Material for MkDocs" footer) ────────────
+    generator = cfg.get("project", {}).get("generator")
+    if generator is False:
+        config["extra"]["generator"] = False
+        logger.info("load_gendoc_config: generator = false")
+
+    # ── Logo ────────────────────────────────────────────────────────────
+    project_logo = cfg.get("project", {}).get("logo")
+    if project_logo:
+        abs_logo = os.path.join(host_project_root, project_logo)
+        if os.path.isfile(abs_logo):
+            config["theme"].logo = abs_logo
+            config["theme"]["logo"] = abs_logo
+            logger.info("load_gendoc_config: logo = %s", abs_logo)
+        else:
+            logger.warning("load_gendoc_config: logo not found at %s", abs_logo)
 
     # ── Site directory ─────────────────────────────────────────────────────
     site_subdir = cfg.get("mkdocs", {}).get("site_dir")

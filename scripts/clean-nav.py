@@ -1,5 +1,5 @@
 """
-clean_nav.py
+clean-nav.py
 
 MkDocs hook that makes linked parent navigation entries render as a clickable
 title (linking to the entry's url) with a separate expand arrow, instead of a
@@ -28,7 +28,7 @@ Requires the `navigation.indexes` feature in mkdocs.yml.
 Registered in mkdocs.yml via:
 
     hooks:
-      - scripts/clean_nav.py
+      - scripts/clean-nav.py
 """
 
 from mkdocs.structure.nav import Link
