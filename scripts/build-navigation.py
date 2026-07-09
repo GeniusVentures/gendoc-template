@@ -587,7 +587,6 @@ if __name__ == "__main__":
         generate_category_pages(src_set["src_dir"], force=args.force)
 
     nav_config = cfg.get("navigation", {})
-    if nav_config.get("generate_index", True):
-        write_root_nav(args.docs_dir, sets, nav_config)
+    write_root_nav(args.docs_dir, sets, nav_config)
 
     sys.exit(0)
