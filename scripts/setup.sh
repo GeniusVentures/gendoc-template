@@ -150,7 +150,7 @@ if [ "$LLMS_ENABLED" = "true" ] && [ "$ASK_ENABLED" = "true" ]; then
     ASK_OPENROUTER_MODELS="${ASK_OPENROUTER_MODELS:-nvidia/nemotron-3-super-120b-a12b:free,nvidia/nemotron-3-ultra-550b-a55b:free,nvidia/nemotron-3-nano-30b-a3b:free}"
 
     ASK_TPL="$TEMPLATE_ROOT/ask-ai/wrangler-ask.toml.template"
-    ASK_OUT="$TEMPLATE_ROOT/ask-ai/wrangler-ask.toml"
+    ASK_OUT="$HOST_ROOT/wrangler-ask.toml"
 
     echo ""
     echo "Generating ask-ai/wrangler-ask.toml from template..."
@@ -167,7 +167,7 @@ with open(sys.argv[1], 'r') as f:
 tokens = {
     '{{WORKER_NAME}}': sys.argv[2],
     '{{COMPATIBILITY_DATE}}': sys.argv[3],
-    '{{LLMS_URL}}': sys.argv[4] + '/llms.txt',
+    '{{LLMS_URL}}': '/llms.txt',
     '{{SITE_URL}}': sys.argv[4],
     '{{ALLOWED_ORIGINS}}': sys.argv[5],
     '{{BOT_NAME}}': sys.argv[6],
