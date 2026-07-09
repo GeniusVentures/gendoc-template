@@ -27,8 +27,8 @@ const STOPWORDS = new Set(
 
 import { MkDocsSearchNormalizer } from './search-normalizer.js'
 
-let catalogCache = { entries: null, ts: 0 } // per-isolate cache
-let normalizerCache = null     // MkDocsSearchNormalizer instance
+const catalogCache = new Map() // per-isolate, per-origin cache: Map<origin, { entries, ts }>
+const normalizerCache = new Map() // Map<origin, MkDocsSearchNormalizer>
 
 let DEBUG = false  // toggled per-request via ?debug=true from localhost
 
@@ -60,6 +60,8 @@ export default {
             return new Response('Origin not allowed', { status: 403 });
         }
 
+        const origin = cors['Access-Control-Allow-Origin']  // guaranteed non-null here
+
         let body
         try {
             body = await request.json()
@@ -74,8 +76,8 @@ export default {
             return json({ error: 'empty question' }, 400, cors);
         }
 
-        const entries = await loadCatalog(env)
-        const terms = await extractTerms(env, question)
+        const entries = await loadCatalog(env, origin)
+        const terms = await extractTerms(env, question, origin)
         // Fetch all scored docs up to a generous limit — TOTAL_CHAR_CAP
         // enforces the real budget, and the LLM context builder stops when full.
         const top = scoreEntries(entries, terms).slice(0, 30)
@@ -103,7 +105,7 @@ export default {
 
         ;(async () => {
             try {
-                const docs = (await Promise.all(top.map((e) => fetchDoc(e, env)))).filter(Boolean)
+                const docs = (await Promise.all(top.map((e) => fetchDoc(e, env, origin)))).filter(Boolean)
                 await send({ sources: docs.map((d) => ({ title: d.title, url: d.url })) })
 
                 let context = '',
@@ -329,12 +331,17 @@ const PROVIDERS = {
 
 /* ------------------------------ catalog load ------------------------------ */
 
-async function loadCatalog(env) {
-    if (!DEBUG && catalogCache.entries && Date.now() - catalogCache.ts < CATALOG_TTL_MS) {
-        return catalogCache.entries;
+async function loadCatalog(env, origin) {
+    const cached = catalogCache.get(origin)
+    if (!DEBUG && cached && Date.now() - cached.ts < CATALOG_TTL_MS) {
+        return cached.entries;
     }
-    const master = await fetchText(env.LLMS_URL)
-    const origin = new URL(env.LLMS_URL).origin
+    let llmsUrl = env.LLMS_URL
+    if (llmsUrl && llmsUrl.startsWith('/')) {
+        llmsUrl = new URL(llmsUrl, origin).href
+    }
+    const master = await fetchText(llmsUrl)
+    const catalogOrigin = new URL(llmsUrl).origin
     const entries = []
     const seen = new Set()
     const parse = (text) => {
@@ -348,23 +355,23 @@ async function loadCatalog(env) {
         }
     }
     parse(master)
-    debug(`master entries: ${entries.length}`)
+    debug(`[${origin}] master entries: ${entries.length}`)
     // one hop into audience catalogs (skip the giant -full file).  Resolve
     // relative URLs against the master catalog origin so site-relative paths
     // in llms.txt work both locally and against deployed custom domains.
     const subs = entries.filter((e) => /llms-(?!full)[\w-]+\.txt$/.test(e.url))
-    debug(`sub-catalogs to fetch: ${subs.length}, urls: ${subs.map(s => s.url).join(', ')}`)
+    debug(`[${origin}] sub-catalogs to fetch: ${subs.length}, urls: ${subs.map(s => s.url).join(', ')}`)
     for (const s of subs) {
         try {
-            const subUrl = new URL(s.url, origin).href
-            debug(`fetching sub-catalog: ${subUrl}`)
+            const subUrl = new URL(s.url, catalogOrigin).href
+            debug(`[${origin}] fetching sub-catalog: ${subUrl}`)
             parse(await fetchText(subUrl))
         } catch (e) {
-            console.error('[ask] sub-catalog fetch failed:', s.url, e.message)
+            console.error(`[ask] [${origin}] sub-catalog fetch failed:`, s.url, e.message)
         }
     }
     const docs = entries.filter((e) => !/llms[\w-]*\.txt$/.test(e.url))
-    catalogCache = { entries: docs, ts: Date.now() }
+    catalogCache.set(origin, { entries: docs, ts: Date.now() })
     return docs
 }
 
@@ -418,19 +425,20 @@ function scoreEntries(entries, terms) {
 
 /* -------------------------- spelling correction via search index --------- */
 
-async function getNormalizer(env) {
-    if (!DEBUG && normalizerCache)
+async function getNormalizer(env, origin) {
+    const cached = normalizerCache.get(origin)
+    if (!DEBUG && cached)
     {
-        return normalizerCache;
+        return cached;
     }
-    const origin = new URL(env.LLMS_URL).origin
     const url = new URL('/search/search_index.json', origin).href
-    normalizerCache = await MkDocsSearchNormalizer.load(url)
-    console.log(`[ask] normalizer loaded: ${normalizerCache.wordToMeta.size} keywords`)
-    return normalizerCache
+    const normalizer = await MkDocsSearchNormalizer.load(url)
+    normalizerCache.set(origin, normalizer)
+    console.log(`[ask] [${origin}] normalizer loaded: ${normalizer.wordToMeta.size} keywords`)
+    return normalizer
 }
 
-async function extractTerms(env, question) {
+async function extractTerms(env, question, origin) {
     const rawTerms = question
         .toLowerCase()
         .match(/[a-z0-9]{2,}/g)
@@ -438,7 +446,7 @@ async function extractTerms(env, question) {
     if (rawTerms.length === 0) return rawTerms;
 
     try {
-        const n = await getNormalizer(env)
+        const n = await getNormalizer(env, origin)
         const result = n.normalizeQuery(question)
         if (result.corrected) {
             console.log(`[ask] spelling corrected: [${rawTerms}] -> [${result.tokens}]`)
@@ -452,32 +460,34 @@ async function extractTerms(env, question) {
 
 /* ------------------------------- doc fetching ----------------------------- */
 
-let contentMapCache = null
+const contentMapCache = new Map() // Map<origin, object>
 
-async function loadContentMap(env) {
-    if (!DEBUG && contentMapCache)
+async function loadContentMap(env, origin) {
+    const cached = contentMapCache.get(origin)
+    if (!DEBUG && cached)
     {
-        return contentMapCache;
+        return cached;
     }
     try {
-        const origin = new URL(env.LLMS_URL).origin
         const url = new URL('/content-map.json', origin).href
-        contentMapCache = await fetchText(url).then(JSON.parse)
+        const contentMap = await fetchText(url).then(JSON.parse)
+        contentMapCache.set(origin, contentMap)
+        return contentMap
     } catch {
-        contentMapCache = {}
+        contentMapCache.set(origin, {})
+        return {}
     }
-    return contentMapCache
 }
 
-async function fetchDoc(entry, env) {
+async function fetchDoc(entry, env, origin) {
     try {
         // Check content map first (clean Doxygen XML text for source-ref entries)
-        const cmap = await loadContentMap(env)
+        const cmap = await loadContentMap(env, origin)
         if (cmap[entry.url]) {
             return { ...entry, text: cmap[entry.url] }
         }
         const docUrl = entry.url.startsWith('/')
-            ? new URL(entry.url, env.SITE_URL || 'http://localhost:8000').href
+            ? new URL(entry.url, env.SITE_URL || origin).href
             : entry.url;
         const res = await fetch(docUrl, {
             headers: { 'User-Agent': 'gendoc-ask-worker/1.0' },
