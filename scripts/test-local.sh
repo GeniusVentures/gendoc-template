@@ -30,7 +30,7 @@ if [ -f "$HOST_SITE/index.html" ] && [ ! -f "$SITE_DIR/index.html" ]; then
 fi
 CONFIG_FILE="$SITE_DIR/ask-config.json"
 WORKER_DIR="$TEMPLATE_ROOT/ask-ai"
-WRANGLER_CONFIG="$TEMPLATE_ROOT/../wrangler-ask.toml"
+WRANGLER_CONFIG="$TEMPLATE_ROOT/ask-ai/wrangler-ask.toml"
 DEV_VARS="$WORKER_DIR/.dev.vars"
 
 WORKER_PORT="${ASK_LOCAL_PORT:-8787}"
@@ -79,8 +79,18 @@ command -v wrangler >/dev/null 2>&1 || { echo "ERROR: wrangler not found (npm in
 command -v python3  >/dev/null 2>&1 || { echo "ERROR: python3 not found" >&2; exit 1; }
 
 if [ ! -f "$WRANGLER_CONFIG" ]; then
-    echo "ERROR: $WRANGLER_CONFIG not found -- run setup.sh first" >&2
-    exit 1
+    echo "wrangler-ask.toml not found — generating from gendoc.yml..."
+    bash "$SCRIPT_DIR/generate-ask-config.sh"
+    if [ ! -f "$WRANGLER_CONFIG" ]; then
+        echo "ERROR: failed to generate $WRANGLER_CONFIG" >&2
+        exit 1
+    fi
+fi
+
+# Ensure worker npm dependencies are installed (TypeScript, Wrangler types).
+if [ ! -d "$WORKER_DIR/worker/node_modules" ]; then
+    echo "Installing worker npm dependencies..."
+    (cd "$WORKER_DIR/worker" && npm install)
 fi
 # ask-config.json may be in the other site dir if the build split.
 if [ ! -f "$CONFIG_FILE" ]; then

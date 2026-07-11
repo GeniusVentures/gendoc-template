@@ -34,72 +34,13 @@ else
     USE_TOKEN_AUTH=true
 fi
 
-# Pull every needed value out of gendoc.yml in one Python pass.
-# Output: one KEY=VALUE per line, consumed into shell variables below.
-eval "$(python3 - "$CONFIG" <<'PY'
-import sys, yaml, shlex
+# Generate wrangler-ask.toml from template + gendoc.yml
+bash "$SCRIPT_DIR/generate-ask-config.sh" "$CONFIG"
 
-cfg = yaml.safe_load(open(sys.argv[1])) or {}
-llms = cfg.get("llms") or {}
-ask = llms.get("ask") or {}
-cf = (cfg.get("deploy") or {}).get("cloudflare") or {}
-project = cfg.get("project") or {}
-
-if not llms.get("enabled") or not ask.get("enabled"):
-    sys.exit("ERROR: llms.enabled and llms.ask.enabled must both be true in gendoc.yml")
-
-site_url = (llms.get("site_url") or "").rstrip("/")
-if not site_url:
-    sys.exit("ERROR: llms.site_url is required")
-
-pages_name = cf.get("pages_project_name") or "gendoc"
-values = {
-    "WORKER_NAME": ask.get("worker_name") or f"{pages_name}-ask",
-    "COMPATIBILITY_DATE": cf.get("compatibility_date") or "2026-06-01",
-    "LLMS_URL": f"{site_url}/llms.txt",
-    "SITE_URL": site_url,
-    "ALLOWED_ORIGINS": ",".join(ask.get("allowed_origins") or [site_url]),
-    "BOT_NAME": ask.get("title") or f"{project.get('name', 'Docs')} Assistant",
-    "PROVIDERS": ask.get("providers") or "gemini,openrouter",
-    "GEMINI_MODEL": ask.get("gemini_model") or "gemini-2.5-flash",
-    "OPENROUTER_MODELS": ask.get("openrouter_models")
-        or "meta-llama/llama-4-scout:free,deepseek/deepseek-chat-v3-0324:free,qwen/qwen3-32b:free",
-    "ENDPOINT": ask.get("endpoint") or "",
-}
-for key, value in values.items():
-    print(f"{key}={shlex.quote(str(value))}")
-PY
-)"
-
-# Substitute {{TOKENS}} into wrangler-ask.toml (all deployable files live
-# under ask-ai/, so wrangler deploy runs from there and main=worker/ask.js
-# resolves naturally).
-GENERATED="$TEMPLATE_ROOT/ask-ai/wrangler-ask.toml"
-sed -e "s|{{WORKER_NAME}}|$WORKER_NAME|g" \
-    -e "s|{{COMPATIBILITY_DATE}}|$COMPATIBILITY_DATE|g" \
-    -e "s|{{LLMS_URL}}|$LLMS_URL|g" \
-    -e "s|{{SITE_URL}}|$SITE_URL|g" \
-    -e "s|{{ALLOWED_ORIGINS}}|$ALLOWED_ORIGINS|g" \
-    -e "s|{{BOT_NAME}}|$BOT_NAME|g" \
-    -e "s|{{PROVIDERS}}|$PROVIDERS|g" \
-    -e "s|{{GEMINI_MODEL}}|$GEMINI_MODEL|g" \
-    -e "s|{{OPENROUTER_MODELS}}|$OPENROUTER_MODELS|g" \
-    "$TEMPLATE_ROOT/ask-ai/wrangler-ask.toml.template" > "$GENERATED"
-
-# When a custom endpoint is configured, append a [[routes]] section so
-# traffic to that domain+path reaches this worker (shared-worker scenario).
-if [ -n "$ENDPOINT" ]; then
-    python3 -c "
-import sys
-from urllib.parse import urlparse
-parsed = urlparse('$ENDPOINT')
-host = parsed.hostname or ''
-path = parsed.path.rstrip('/') or '/api/ask'
-route_path = '/'.join(path.split('/')[:-1] + ['*'])
-zone = '.'.join(host.split('.')[-2:])
-with open('$GENERATED', 'a') as f:
-    f.write(f'\n[[routes]]\npattern = \"{host}{route_path}\"\nzone_name = \"{zone}\"\n')
-"
+# Source computed values back (subshell-safe)
+VARS_FILE="$TEMPLATE_ROOT/ask-ai/.generated-vars"
+if [ -f "$VARS_FILE" ]; then
+    source "$VARS_FILE"
 fi
 
 echo "==> Deploying ask worker '$WORKER_NAME'"
