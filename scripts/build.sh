@@ -117,16 +117,36 @@ else
     exit $exit_code
 fi
 
-# ── Step 4: Build ask widget (must run AFTER mkdocs — writes to site dir) ──────
+# ── Step 4: Build search vocabulary for the typo-tolerant ask worker ──────────
 echo ""
 echo "=============================================="
-echo "  Step 4:  Building ask widget"
+echo "  Step 4:  Building search vocabulary"
+echo "=============================================="
+VOCAB_BUILDER="$SCRIPT_DIR/build-vocab.py"
+SEARCH_INDEX="$SITE_DIR_ABS/search/search_index.json"
+VOCAB_OUT="$SITE_DIR_ABS/data/search-vocab.json"
+
+if [ -f "$SEARCH_INDEX" ] && [ -f "$VOCAB_BUILDER" ]; then
+    mkdir -p "$(dirname "$VOCAB_OUT")"
+    if python3 "$VOCAB_BUILDER" "$SEARCH_INDEX" "$VOCAB_OUT"; then
+        echo "  Search vocabulary built: $VOCAB_OUT"
+    else
+        echo "  WARNING: build-vocab.py failed (ask worker will use raw term matching)"
+    fi
+else
+    echo "  Skipped — search_index.json or build-vocab.py not found"
+fi
+
+# ── Step 5: Build ask widget (must run AFTER mkdocs — writes to site dir) ──────
+echo ""
+echo "=============================================="
+echo "  Step 5:  Building ask widget"
 echo "=============================================="
 "$SCRIPT_DIR/build-widget.sh"
 
 echo ""
 echo "=============================================="
-echo "  Step 5: Generating llms.txt agent catalogs"
+echo "  Step 6: Generating llms.txt agent catalogs"
 echo "=============================================="
 python3 "$SCRIPT_DIR/build-llms.py" "$@"
 

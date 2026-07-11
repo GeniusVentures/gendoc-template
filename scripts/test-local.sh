@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # test-local.sh -- run the ask worker and static site locally for development.
 #
-# Step 1 (one-time, manual): create ask-ai/.dev.vars with your API keys:
-#   cat > gendoc-template/ask-ai/.dev.vars <<'EOF'
+# Step 1 (one-time, manual): create .dev.vars in the project root with your API keys:
+#   cat > .dev.vars <<'EOF'
 #   GEMINI_API_KEY=your-gemini-key-here
 #   OPENROUTER_API_KEY=your-openrouter-key-here
 #   EOF
@@ -31,7 +31,7 @@ fi
 CONFIG_FILE="$SITE_DIR/ask-config.json"
 WORKER_DIR="$TEMPLATE_ROOT/ask-ai"
 WRANGLER_CONFIG="$TEMPLATE_ROOT/../wrangler-ask.toml"
-DEV_VARS="$WORKER_DIR/.dev.vars"
+DEV_VARS="$HOST_ROOT/.dev.vars"
 
 WORKER_PORT="${ASK_LOCAL_PORT:-8787}"
 SITE_PORT="${ASK_SITE_PORT:-8000}"
@@ -82,6 +82,15 @@ bash "$SCRIPT_DIR/generate-ask-config.sh"
 if [ ! -f "$WRANGLER_CONFIG" ]; then
     echo "ERROR: failed to generate $WRANGLER_CONFIG" >&2
     exit 1
+fi
+
+# Build the search vocabulary so the worker has typo correction locally.
+VOCAB_BUILDER="$SCRIPT_DIR/build-vocab.py"
+SEARCH_INDEX="$SITE_DIR/search/search_index.json"
+VOCAB_OUT="$SITE_DIR/data/search-vocab.json"
+if [ -f "$SEARCH_INDEX" ] && [ -f "$VOCAB_BUILDER" ]; then
+    mkdir -p "$(dirname "$VOCAB_OUT")"
+    python3 "$VOCAB_BUILDER" "$SEARCH_INDEX" "$VOCAB_OUT" || true
 fi
 
 # Ensure worker npm dependencies are installed (TypeScript, Wrangler types).

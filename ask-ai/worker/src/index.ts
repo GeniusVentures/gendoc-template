@@ -12,7 +12,8 @@
 
 import { Env, SSEMessage } from './types.js';
 import { corsHeaders, json, enc, debug, PROVIDER_FIRST_TOKEN_MS, DOC_CHAR_CAP, TOTAL_CHAR_CAP } from './utils.js';
-import { loadCatalog, scoreEntries, extractTerms, fetchDoc } from './catalog.js';
+import { loadCatalog, scoreEntries, fetchDoc } from './catalog.js';
+import { extractTerms } from './normalizer.js';
 import { isJailbreakAttempt } from './jailbreak.js';
 import { PROVIDERS } from './providers.js';
 

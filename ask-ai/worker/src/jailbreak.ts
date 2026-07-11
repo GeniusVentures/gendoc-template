@@ -1,5 +1,4 @@
 import { Env } from './types.js';
-import { getNormalizer } from './catalog.js'; // we'll create this
 
 const JAILBREAK_KEYWORDS = [
   'ignore', 'disregard', 'forget', 'bypass', 'override', 'jailbreak', 'dan',
@@ -7,33 +6,43 @@ const JAILBREAK_KEYWORDS = [
   'reveal system', 'hidden instructions', 'pretend you are'
 ];
 
+// Common misspellings of jailbreak keywords that attackers use to evade
+// simple string matching (e.g. "igonre" → "ignore").
+const JAILBREAK_MISSPELLINGS: Record<string, string> = {
+  'igonre': 'ignore', 'ignor': 'ignore', 'ingore': 'ignore',
+  'disregard': 'disregard', 'disreguard': 'disregard',
+  'forget': 'forget', 'forgit': 'forget',
+  'bypass': 'bypass', 'bypas': 'bypass', 'bipass': 'bypass',
+  'overide': 'override',
+  'jailbrake': 'jailbreak', 'jailbrak': 'jailbreak',
+  'devloper': 'developer', 'developr': 'developer',
+  'uncensored': 'uncensored', 'uncensor': 'uncensored',
+};
+
+function correctMisspellings(text: string): string {
+  return text.split(/\s+/).map(w => JAILBREAK_MISSPELLINGS[w] || w).join(' ');
+}
+
 export async function isJailbreakAttempt(
   question: string,
-  env: Env,
-  origin: string
+  _env: Env,
+  _origin: string
 ): Promise<boolean> {
   if (!question || question.length < 5) return false;
 
   const lower = question.toLowerCase();
 
-  // Fast keyword check
+  // Direct keyword match
   if (JAILBREAK_KEYWORDS.some(kw => lower.includes(kw))) {
     console.warn(`[ask] jailbreak keyword match: ${question.slice(0, 100)}`);
     return true;
   }
 
-  // Use existing normalizer for misspelling detection (e.g. "igonre")
-  try {
-    const normalizer = await getNormalizer(env, origin);
-    const result = normalizer.normalizeQuery(question);
-    const corrected = result.tokens.join(' ').toLowerCase();
-
-    if (JAILBREAK_KEYWORDS.some(kw => corrected.includes(kw))) {
-      console.warn(`[ask] jailbreak via spelling correction: "${question}" → "${corrected}"`);
-      return true;
-    }
-  } catch (e: any) {
-    console.warn('[ask] normalizer failed for jailbreak check:', e.message);
+  // Misspelling-corrected check (O(1) map lookup, no 3 MB JSON load)
+  const corrected = correctMisspellings(lower);
+  if (JAILBREAK_KEYWORDS.some(kw => corrected.includes(kw))) {
+    console.warn(`[ask] jailbreak via spelling correction: "${question}" → "${corrected}"`);
+    return true;
   }
 
   return false;
