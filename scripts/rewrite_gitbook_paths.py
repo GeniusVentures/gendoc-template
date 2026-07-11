@@ -250,6 +250,8 @@ def on_page_markdown(markdown, page, config, files):
        attributes are not rewritten by MkDocs, so relative paths cannot work).
     3. Strip raw Doxygen tags that doxybook2 emits as literal text.
     """
+    if not config.get("gitbook_mode"):
+        return markdown
     markdown = _inject_cover(markdown, page)
     markdown = _inject_description(markdown, page)
     markdown = _GITBOOK_FILE.sub(_file_to_link, markdown)
@@ -274,6 +276,9 @@ def on_nav(nav, config, files):
       * [GNUS.AI](README.md)         -- misplaced child artifact
     Both are leaf items whose src_path is exactly 'README.md'.
     """
+    if not config.get("gitbook_mode"):
+        return nav
+
     def _filter(items):
         result = []
         for item in items:
@@ -296,6 +301,8 @@ def on_post_build(config):
     Inject a pre-bundle search-index gzip shim into generated HTML so local
     preview still works when the search index is stored as gzipped bytes.
     """
+    if not config.get("gitbook_mode"):
+        return
     site_dir = config.get('site_dir')
     if not site_dir:
         return

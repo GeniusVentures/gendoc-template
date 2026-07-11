@@ -446,6 +446,10 @@ def write_root_nav(docs_dir, sets, nav_config):
         label:           Unlinked nav section label
         source_file:     Markdown file whose list items populate the section
         extract_heading: Optional H2 heading to scope extraction (empty = all links)
+        gitbook:         If true, convert ``##`` headings to unlinked list items
+                         and shift children down one level so the entire nav is
+                         one unbroken <ul> (literate-nav only reads the last <ul>
+                         in the document).
 
     Each entry in `sets` defines:
         label:     Unlinked nav section label for the source set
@@ -454,12 +458,66 @@ def write_root_nav(docs_dir, sets, nav_config):
 
     The generated source reference sections are appended last with directory
     URLs (trailing /) for the section-index plugin.
+
+    When a section has gitbook: true, the old write_root_nav() text-
+    transformation approach is used: ``##`` headings become unlinked list
+    items, children are shifted by 4 spaces, blank lines are preserved, and
+    the output is written directly without ``<!--nav-->`` or
+    build_literate_nav formatting.
     """
     sections_conf = nav_config.get("sections", [])
 
+    # ── GitBook mode: use the old text-transformation approach ───────────
+    gitbook_sections = [s for s in sections_conf if s.get("gitbook")]
+    if gitbook_sections:
+        # Read and convert SUMMARY.md content (replicates old write_root_nav).
+        converted = []
+        for section in gitbook_sections:
+            filepath = os.path.join(docs_dir, section.get("source_file", ""))
+            if not os.path.isfile(filepath):
+                continue
+            with open(filepath, 'r', encoding='utf-8') as f:
+                raw_lines = f.readlines()
+            for line in raw_lines:
+                stripped = line.rstrip('\n')
+                if re.match(r'^# ', stripped) and not re.match(r'^## ', stripped):
+                    pass
+                elif re.match(r'^## ', stripped):
+                    label = stripped[3:].strip()
+                    converted.append(f"- {label}\n")
+                elif re.match(r'^\s*- ', stripped):
+                    converted.append("    " + line)
+                else:
+                    converted.append(line)
+
+        content = "".join(converted).rstrip()
+
+        # Append source reference sections.
+        for src_set in sets:
+            src_dir = src_set["src_dir"]
+            src_dir_basename = os.path.basename(src_dir)
+            cat_lines = []
+            for entry in sorted(os.scandir(src_dir), key=lambda e: e.name):
+                if entry.is_dir() and os.path.exists(
+                    os.path.join(entry.path, "SUMMARY_EXT.md")):
+                    cat_lines.append(
+                        f"      - [{entry.name}]({src_dir_basename}/{entry.name}/)"
+                    )
+            if cat_lines:
+                label = src_set.get("label") or src_dir_basename
+                content += f"\n- {label}\n"
+                content += "\n".join(cat_lines) + "\n"
+
+        output_path = os.path.join(docs_dir, "SUMMARY_EXT.md")
+        with open(output_path, 'w', encoding='utf-8') as fh:
+            fh.write(content)
+        print(f"Root SUMMARY_EXT.md written to {output_path} (gitbook mode, "
+              f"{len(sets)} source set(s))")
+        return
+
+    # ── Standard mode: item-based nav ─────────────────────────────────────
     items = []
 
-    # ── Process each configured section ────────────────────────────────────────
     for section in sections_conf:
         label = section.get("label", "")
         source_file = section.get("source_file", "")
@@ -477,45 +535,37 @@ def write_root_nav(docs_dir, sets, nav_config):
                   file=sys.stderr)
             continue
 
-        # Unlinked section label.
         if label:
             items.append((0, label, None))
 
-        # Extract links from the source file (scoped by heading if configured).
         section_links = extract_links_from_section(filepath, extract_heading)
-
         if section.get("promote_page_roots"):
             section_links = _promote_page_roots(section_links)
-
-        # Shift indent +1 so children nest under the section label.
         for indent, text, url in section_links:
             items.append((indent + 1, text, url))
 
-    # ── Append one section per source reference set ──────────────────────
     for src_set in sets:
         src_dir = src_set["src_dir"]
         src_dir_basename = os.path.basename(src_dir)
         set_items = []
-
         for category in CATEGORIES:
             cat_summary = os.path.join(src_dir, category, "SUMMARY_EXT.md")
             if os.path.isfile(cat_summary):
                 set_items.append((1, category, f"{src_dir_basename}/{category}/"))
-
         if not set_items:
             continue
-
         items.append((0, src_set.get("label") or src_dir_basename, None))
         items.extend(set_items)
-
         category_names = [c for _, c, _ in set_items]
         _write_readme(src_dir, category_names,
                       src_set.get("label") or src_dir_basename,
                       src_set.get("language", ""))
 
-    # ── Build and write SUMMARY_EXT.md ─────────────────────────────────────
     nav_content = build_literate_nav(items)
     output_path = os.path.join(docs_dir, "SUMMARY_EXT.md")
+
+    # ── Standard mode: item-based nav ─────────────────────────────────────
+    items = []
     with open(output_path, 'w', encoding='utf-8') as fh:
         fh.write(nav_content)
 

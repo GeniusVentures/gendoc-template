@@ -110,6 +110,28 @@ def on_config(config):
     # Stash logo basename for post-build path fix
     config["_logo_basename"] = config["theme"].get("logo", "")
 
+    # ── GitBook mode flag — enables rewrite_gitbook_paths.py hook ──────────
+    nav_sections = cfg.get("navigation", {}).get("sections", [])
+    config["gitbook_mode"] = any(s.get("gitbook") for s in nav_sections)
+    if config["gitbook_mode"]:
+        logger.info("load_gendoc_config: gitbook_mode = true")
+
+    # ── Section-index plugin — disable when nav uses section-index=false ────
+    if cfg.get("navigation", {}).get("section_index") is False:
+        before = list(config["plugins"].keys())
+        result = config["plugins"].pop("section-index", None)
+        after = list(config["plugins"].keys())
+        logger.info("load_gendoc_config: section_index pop result=%r, before=%s, after=%s",
+                    result, before, after)
+        logger.info("load_gendoc_config: section_index = false (plugin removed)")
+
+    # ── navigation.indexes feature — disable when nav uses navigation_indexes=false
+    if cfg.get("navigation", {}).get("navigation_indexes") is False:
+        features = config["theme"]["features"]
+        if "navigation.indexes" in features:
+            features.remove("navigation.indexes")
+            logger.info("load_gendoc_config: navigation_indexes = false (feature removed)")
+
     return config
 
 

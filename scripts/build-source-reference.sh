@@ -69,6 +69,7 @@ GENERATE_XML_RAW=$(read_yaml "doxygen.generate_xml")
 GENERATE_HTML_RAW=$(read_yaml "doxygen.generate_html")
 RECURSIVE_RAW=$(read_yaml "doxygen.recursive")
 STRIP_FROM_PATH=$(read_yaml "doxygen.strip_from_path")
+FULL_PATH_NAMES_RAW=$(read_yaml "doxygen.full_path_names")
 
 # ── Validate required values ──────────────────────────────────────────────────
 if [ -z "$PROJECT_NAME" ]; then
@@ -111,6 +112,7 @@ bool_to_yesno() {
 GENERATE_XML=$(bool_to_yesno "$GENERATE_XML_RAW")
 GENERATE_HTML=$(bool_to_yesno "$GENERATE_HTML_RAW")
 RECURSIVE=$(bool_to_yesno "$RECURSIVE_RAW")
+FULL_PATH_NAMES=$(bool_to_yesno "$FULL_PATH_NAMES_RAW")
 
 # ── Emit the source_references list as a manifest delimited by the ASCII ──────
 # unit separator (\x1f).  This byte is NOT an IFS-whitespace character, so bash
@@ -128,7 +130,11 @@ for s in sets:
     name = str(s.get('name', '') or '')
     label = str(s.get('label', '') or name)
     language = str(s.get('language', '') or '')
-    source = str(s.get('source', '') or '')
+    source = s.get('source', '') or ''
+    if isinstance(source, list):
+        source = ' '.join(str(p) for p in source)
+    else:
+        source = str(source)
     file_patterns = ' '.join(str(p) for p in (s.get('file_patterns') or []))
     exclude_patterns = ' '.join(str(p) for p in (s.get('exclude_patterns') or []))
     output_subdir = str(s.get('output_subdir', '') or '')
@@ -213,6 +219,7 @@ build_one_set() {
         -e 's|{{GENERATE_XML}}|'"$GENERATE_XML"'|g' \
         -e 's|{{GENERATE_HTML}}|'"$GENERATE_HTML"'|g' \
         -e 's|{{RECURSIVE}}|'"$RECURSIVE"'|g' \
+        -e 's|{{FULL_PATH_NAMES}}|'"$FULL_PATH_NAMES"'|g' \
         -e 's|{{STRIP_FROM_PATH}}|'"$STRIP_FROM_PATH"'|g' \
         "$doxyfile_out"
 

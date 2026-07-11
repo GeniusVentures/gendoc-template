@@ -113,7 +113,15 @@ def _promote_section_indexes(item):
 
 
 def on_nav(nav, config, files):
-    """MkDocs hook entry point — rewrite Link urls then promote indexes."""
+    """MkDocs hook entry point — rewrite Link urls then promote indexes.
+
+    Only runs for non-GitBook projects (config.gitbook_mode is False or
+    absent).  GitBook projects use literate-nav with SectionPage items that
+    already carry their own URLs — adding synthetic indexes for those creates
+    blank entries that render as empty nav slots (e.g. FAQS disappearing).
+    """
+    if config.get("gitbook_mode"):
+        return nav
     for item in nav.items:
         _rewrite_link_urls(item)
         _promote_section_indexes(item)
