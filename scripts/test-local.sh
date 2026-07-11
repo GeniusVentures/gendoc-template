@@ -30,7 +30,7 @@ if [ -f "$HOST_SITE/index.html" ] && [ ! -f "$SITE_DIR/index.html" ]; then
 fi
 CONFIG_FILE="$SITE_DIR/ask-config.json"
 WORKER_DIR="$TEMPLATE_ROOT/ask-ai"
-WRANGLER_CONFIG="$TEMPLATE_ROOT/ask-ai/wrangler-ask.toml"
+WRANGLER_CONFIG="$TEMPLATE_ROOT/../wrangler-ask.toml"
 DEV_VARS="$WORKER_DIR/.dev.vars"
 
 WORKER_PORT="${ASK_LOCAL_PORT:-8787}"

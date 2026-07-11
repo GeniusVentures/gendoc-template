@@ -3,6 +3,7 @@
 #
 # Run from the HOST PROJECT ROOT:
 #   gendoc-template/scripts/generate-ask-config.sh [gendoc.yml] [--force]
+# Output is written to ./wrangler-ask.toml (host project root).
 #
 # Skips generation if the output is already newer than both inputs.
 # Pass --force to always regenerate.
@@ -11,13 +12,20 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-CONFIG="${1:-gendoc.yml}"
+
+FORCE=""
+CONFIG="gendoc.yml"
+for arg in "$@"; do
+    case "$arg" in
+        --force) FORCE="--force" ;;
+        *) CONFIG="$arg" ;;
+    esac
+done
 
 [ -f "$CONFIG" ] || { echo "ERROR: $CONFIG not found -- run from the host project root" >&2; exit 1; }
 
 TEMPLATE="$TEMPLATE_ROOT/ask-ai/wrangler-ask.toml.template"
-GENERATED="$TEMPLATE_ROOT/ask-ai/wrangler-ask.toml"
-FORCE="${2:-}"
+GENERATED="$TEMPLATE_ROOT/../wrangler-ask.toml"
 
 # Skip generation if the output is already newer than both inputs.
 if [ "$FORCE" != "--force" ] && [ -f "$GENERATED" ] && [ -f "$TEMPLATE" ]; then
@@ -99,7 +107,7 @@ fi
 
 # Write a small env file so callers (e.g. deploy-ask.sh) can source back
 # the computed values without re-parsing gendoc.yml.
-VARS_FILE="$TEMPLATE_ROOT/ask-ai/.generated-vars"
+VARS_FILE="$(dirname "$GENERATED")/.generated-vars"
 cat > "$VARS_FILE" <<EOF
 WORKER_NAME=$WORKER_NAME
 ENDPOINT=$ENDPOINT
