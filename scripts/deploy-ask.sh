@@ -24,11 +24,14 @@ fi
 
 [ -f "$CONFIG" ] || { echo "ERROR: $CONFIG not found -- run from the host project root" >&2; exit 1; }
 command -v wrangler >/dev/null 2>&1 || { echo "ERROR: wrangler not found (npm install -g wrangler)" >&2; exit 1; }
-# CF_API_TOKEN / CF_ACCOUNT_ID are required for CI/CD headless deploys.
-# For local dev, wrangler login (OAuth) is sufficient -- skip the check.
-if ! wrangler whoami >/dev/null 2>&1; then
+# When wrangler login (OAuth) is active, prefer it.  Fall back to API-token
+# env vars for CI/CD headless deploys.
+if wrangler whoami >/dev/null 2>&1; then
+    USE_TOKEN_AUTH=false
+else
     : "${CF_API_TOKEN:?ERROR: CF_API_TOKEN environment variable is not set (or run: wrangler login)}"
     : "${CF_ACCOUNT_ID:?ERROR: CF_ACCOUNT_ID environment variable is not set (or run: wrangler login)}"
+    USE_TOKEN_AUTH=true
 fi
 
 # Pull every needed value out of gendoc.yml in one Python pass.
@@ -100,8 +103,12 @@ with open('$GENERATED', 'a') as f:
 fi
 
 echo "==> Deploying ask worker '$WORKER_NAME'"
-DEPLOY_OUTPUT=$(cd "$TEMPLATE_ROOT/ask-ai" && CLOUDFLARE_API_TOKEN="$CF_API_TOKEN" CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT_ID" \
-  wrangler deploy --config "$GENERATED" 2>&1)
+if [ "$USE_TOKEN_AUTH" = true ]; then
+  DEPLOY_OUTPUT=$(cd "$TEMPLATE_ROOT/ask-ai" && CLOUDFLARE_API_TOKEN="$CF_API_TOKEN" CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT_ID" \
+    wrangler deploy --config "$GENERATED" 2>&1)
+else
+  DEPLOY_OUTPUT=$(cd "$TEMPLATE_ROOT/ask-ai" && wrangler deploy --config "$GENERATED" 2>&1)
+fi
 echo "$DEPLOY_OUTPUT"
 
 # Resolve the endpoint so build-widget.sh can generate ask-config.json.
