@@ -100,17 +100,10 @@ else
     echo "  index.md regenerated from $HANDWRITTEN_DOCS/index.md.template"
 fi
 
-# ── Step 3: Build ask widget ─────────────────────────────────────────────────
+# ── Step 3: Build MkDocs site ─────────────────────────────────────────────────
 echo ""
 echo "=============================================="
-echo "  Step 3:  Building ask widget"
-echo "=============================================="
-"$SCRIPT_DIR/build-widget.sh"
-
-# ── Step 4: Build MkDocs site ─────────────────────────────────────────────────
-echo ""
-echo "=============================================="
-echo "  Step 4: Building MkDocs site"
+echo "  Step 3: Building MkDocs site"
 echo "=============================================="
 
 SITE_DIR_ABS="$TEMPLATE_ROOT/$SITE_DIR"
@@ -123,6 +116,13 @@ else
     echo "Error: mkdocs build failed with exit code $exit_code" >&2
     exit $exit_code
 fi
+
+# ── Step 4: Build ask widget (must run AFTER mkdocs — writes to site dir) ──────
+echo ""
+echo "=============================================="
+echo "  Step 4:  Building ask widget"
+echo "=============================================="
+"$SCRIPT_DIR/build-widget.sh"
 
 echo ""
 echo "=============================================="
