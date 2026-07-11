@@ -2,7 +2,7 @@
 # The setup/deploy scripts substitute {{TOKENS}} from gendoc.yml.
 
 name = "{{WORKER_NAME}}"
-main = "ask-ai/worker/src/index.ts"
+main = "gendoc-template/ask-ai/worker/src/index.ts"
 compatibility_date = "{{COMPATIBILITY_DATE}}"
 
 [vars]
