@@ -1,0 +1,14 @@
+{
+  "name": "@geniusventures/gendoc-ask-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "wrangler deploy --dry-run --outdir dist"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "latest",
+    "typescript": "^5.8.3",
+    "wrangler": "latest"
+  }
+}
