@@ -104,7 +104,13 @@ export default {
 
     (async () => {
       try {
-        const docs = (await Promise.all(top.map(e => fetchDoc(e, env, origin)))).filter(Boolean) as any[];
+        // Fetch docs in batches of 3 to stay under the 128 MB memory limit.
+        const docs: any[] = [];
+        for (let i = 0; i < top.length; i += 3) {
+          const batch = top.slice(i, i + 3).map(e => fetchDoc(e, env, origin));
+          const results = await Promise.all(batch);
+          docs.push(...results.filter(Boolean));
+        }
         await send({ sources: docs.map(d => ({ title: d.title, url: d.url })) });
 
         let context = '';

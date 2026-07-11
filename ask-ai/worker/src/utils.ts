@@ -4,7 +4,7 @@ export const DOC_CHAR_CAP = 15000;
 export const TOTAL_CHAR_CAP = 40000;
 export const CATALOG_TTL_MS = 15 * 60 * 1000;
 export const PROVIDER_CONNECT_MS = 5000;
-export const PROVIDER_FIRST_TOKEN_MS = 15000;
+export const PROVIDER_FIRST_TOKEN_MS = 30000;
 
 export const STOPWORDS = new Set(
   ('a an and are as at be by for from how in is it of on or that the this to was ' +
