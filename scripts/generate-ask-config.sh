@@ -2,9 +2,10 @@
 # generate-ask-config.sh — generate ask-ai/wrangler-ask.toml from gendoc.yml.
 #
 # Run from the HOST PROJECT ROOT:
-#   gendoc-template/scripts/generate-ask-config.sh [gendoc.yml]
+#   gendoc-template/scripts/generate-ask-config.sh [gendoc.yml] [--force]
 #
-# This only generates the config file — it does NOT deploy.
+# Skips generation if the output is already newer than both inputs.
+# Pass --force to always regenerate.
 # Called by both deploy-ask.sh and test-local.sh.
 set -euo pipefail
 
@@ -13,6 +14,18 @@ TEMPLATE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG="${1:-gendoc.yml}"
 
 [ -f "$CONFIG" ] || { echo "ERROR: $CONFIG not found -- run from the host project root" >&2; exit 1; }
+
+TEMPLATE="$TEMPLATE_ROOT/ask-ai/wrangler-ask.toml.template"
+GENERATED="$TEMPLATE_ROOT/ask-ai/wrangler-ask.toml"
+FORCE="${2:-}"
+
+# Skip generation if the output is already newer than both inputs.
+if [ "$FORCE" != "--force" ] && [ -f "$GENERATED" ] && [ -f "$TEMPLATE" ]; then
+    if [ "$GENERATED" -nt "$CONFIG" ] && [ "$GENERATED" -nt "$TEMPLATE" ]; then
+        echo "Config is up to date: $GENERATED"
+        exit 0
+    fi
+fi
 
 # Pull every needed value out of gendoc.yml in one Python pass.
 # Output: one KEY=VALUE per line, consumed into shell variables below.
@@ -52,9 +65,6 @@ PY
 )"
 
 # Substitute {{TOKENS}} into wrangler-ask.toml.template
-TEMPLATE="$TEMPLATE_ROOT/ask-ai/wrangler-ask.toml.template"
-GENERATED="$TEMPLATE_ROOT/ask-ai/wrangler-ask.toml"
-
 if [ ! -f "$TEMPLATE" ]; then
     echo "ERROR: template not found at $TEMPLATE" >&2
     exit 1

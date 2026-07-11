@@ -78,13 +78,10 @@ trap cleanup EXIT INT TERM
 command -v wrangler >/dev/null 2>&1 || { echo "ERROR: wrangler not found (npm install -g wrangler)" >&2; exit 1; }
 command -v python3  >/dev/null 2>&1 || { echo "ERROR: python3 not found" >&2; exit 1; }
 
+bash "$SCRIPT_DIR/generate-ask-config.sh"
 if [ ! -f "$WRANGLER_CONFIG" ]; then
-    echo "wrangler-ask.toml not found — generating from gendoc.yml..."
-    bash "$SCRIPT_DIR/generate-ask-config.sh"
-    if [ ! -f "$WRANGLER_CONFIG" ]; then
-        echo "ERROR: failed to generate $WRANGLER_CONFIG" >&2
-        exit 1
-    fi
+    echo "ERROR: failed to generate $WRANGLER_CONFIG" >&2
+    exit 1
 fi
 
 # Ensure worker npm dependencies are installed (TypeScript, Wrangler types).
