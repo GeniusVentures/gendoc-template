@@ -101,6 +101,17 @@ export const DRAWER_CSS = `
   .thinking summary {
     cursor: pointer; user-select: none; padding: 2px 0;
   }
+  .thinking.streaming summary::after {
+    content: "";
+    animation: thinking-dots 1.4s steps(4, end) infinite;
+  }
+  @keyframes thinking-dots {
+    0%   { content: ""; }
+    25%  { content: "."; }
+    50%  { content: ".."; }
+    75%  { content: "..."; }
+    100% { content: "..."; }
+  }
   .thinking pre {
     white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word;
     max-width: 100%; overflow-x: auto;
@@ -120,6 +131,11 @@ export const DRAWER_CSS = `
     padding-left: 8px; border-left: 2px solid var(--ask-drawer-border, #e2e8ee);
   }
 
+  .provider {
+    display: inline-block; font-size: 10px; color: var(--ask-muted-fg, #8899aa);
+    text-transform: uppercase; letter-spacing: .5px;
+    margin: 0 0 4px 0;
+  }
   .hint { color: var(--ask-muted-fg, #5c6b78); font-size: 12.5px; margin: auto; text-align: center; padding: 0 20px; }
 
   form { flex: none; display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--ask-drawer-border, #e2e8ee); }

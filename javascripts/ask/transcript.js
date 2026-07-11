@@ -24,12 +24,21 @@ export class Transcript {
             .map(({ role, text }) => ({ role, content: text }));
     }
     addUser(text) {
-        this.push({ role: "user", thinking: "", text, sources: [] });
+        this.push({ role: "user", provider: "", thinking: "", text, sources: [] });
     }
     /** Start a streaming assistant message; returns its index for updates. */
     beginAssistant() {
-        this.push({ role: "assistant", thinking: "", text: "", sources: [] });
+        this.push({ role: "assistant", provider: "", thinking: "", text: "", sources: [] });
         return this.messages.length - 1;
+    }
+    setProvider(index, provider) {
+        const msg = this.messages[index];
+        if (!msg) {
+            return;
+        }
+        msg.provider = provider;
+        this.emit({ kind: "update", index });
+        this.save();
     }
     appendThinking(index, delta) {
         const msg = this.messages[index];
@@ -116,6 +125,7 @@ export class Transcript {
             if ((item.role === "user" || item.role === "assistant") && typeof item.text === "string") {
                 this.messages.push({
                     role: item.role,
+                    provider: typeof item.provider === "string" ? item.provider : "",
                     thinking: typeof item.thinking === "string" ? item.thinking : "",
                     text: item.text,
                     sources: Array.isArray(item.sources) ? item.sources : [],

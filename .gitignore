@@ -37,6 +37,6 @@ wrangler.toml
 **/generated-api/**
 
 # Generated ask-ai files (produced by setup.sh / deploy-ask.sh)
-ask-ai/wrangler-ask.toml
 ask-ai/.endpoint
 ask-ai/.dev.vars
+ask-ai/wrangler-ask.toml

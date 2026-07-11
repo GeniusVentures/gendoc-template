@@ -5,6 +5,7 @@ import type { ChatTurn, Source } from "./types.js";
 export interface Message
 {
   readonly role: "user" | "assistant";
+  provider: string;
   thinking: string;
   text: string;
   sources: readonly Source[];
@@ -54,14 +55,26 @@ export class Transcript
 
   addUser(text: string): void
   {
-    this.push({ role: "user", thinking: "", text, sources: [] });
+    this.push({ role: "user", provider: "", thinking: "", text, sources: [] });
   }
 
   /** Start a streaming assistant message; returns its index for updates. */
   beginAssistant(): number
   {
-    this.push({ role: "assistant", thinking: "", text: "", sources: [] });
+    this.push({ role: "assistant", provider: "", thinking: "", text: "", sources: [] });
     return this.messages.length - 1;
+  }
+
+  setProvider(index: number, provider: string): void
+  {
+    const msg = this.messages[index];
+    if (!msg)
+    {
+      return;
+    }
+    msg.provider = provider;
+    this.emit({ kind: "update", index });
+    this.save();
   }
 
   appendThinking(index: number, delta: string): void
@@ -182,6 +195,7 @@ export class Transcript
       {
         this.messages.push({
           role: item.role,
+          provider: typeof item.provider === "string" ? item.provider : "",
           thinking: typeof item.thinking === "string" ? item.thinking : "",
           text: item.text,
           sources: Array.isArray(item.sources) ? item.sources : [],

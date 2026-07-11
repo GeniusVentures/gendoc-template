@@ -17,6 +17,8 @@
 const DOC_CHAR_CAP = 15000 // per-document context cap
 const TOTAL_CHAR_CAP = 40000 // whole-context cap
 const CATALOG_TTL_MS = 15 * 60 * 1000
+const PROVIDER_CONNECT_MS = 3000  // timeout for TCP/TLS + HTTP response headers
+const PROVIDER_FIRST_TOKEN_MS = 8000 // timeout for first SSE token after connection
 
 const STOPWORDS = new Set(
     ('a an and are as at be by for from how in is it of on or that the this to was ' +
@@ -135,33 +137,53 @@ export default {
 
                 // ---- provider chain: try each until one accepts the request ----
                 const chain = (env.PROVIDERS || 'openrouter,gemini').split(',').map((s) => s.trim())
-                let upstream = null
+
+                // Try each provider.  Connection must succeed within
+                // PROVIDER_CONNECT_MS; first token must arrive within
+                // PROVIDER_FIRST_TOKEN_MS.  On either timeout, fall through
+                // to the next provider.
+                let emittedText = false
+                let hadThinking = false
+                let thinkingText = ''
+                let upstreamError = null
+
                 for (const name of chain) {
+                    let upstream = null
                     try {
                         upstream = await PROVIDERS[name]?.(env, system, history, question)
-                        if (upstream) {
-                            break;
-                        }
                     } catch (e) {
                         console.error(`provider ${name} failed:`, e.message)
+                        continue
                     }
-                }
+                    if (!upstream) {
+                        continue
+                    }
 
-                if (!upstream) {
-                    await send({
-                        text: 'The assistant is temporarily over capacity. Please try again in a few minutes.',
-                    })
-                } else {
-                    // pump the provider's SSE, re-emitting just the text deltas
+                    await send({ provider: name })
+
+                    // Pump the provider's SSE
                     const reader = upstream.res.body.getReader()
                     const dec = new TextDecoder()
                     let buf = ''
-                    let emittedText = false
-                    let hadThinking = false
-                    let thinkingText = ''
-                    let upstreamError = null
-                    for (;;) {
-                        const { done, value } = await reader.read()
+                    let firstToken = true
+                    let pumpDone = false
+
+                    while (!pumpDone) {
+                        let readResult
+                        if (firstToken) {
+                            const timeout = new Promise((_, reject) =>
+                                setTimeout(() => reject(new Error('first token timeout')), PROVIDER_FIRST_TOKEN_MS))
+                            try {
+                                readResult = await Promise.race([reader.read(), timeout])
+                            } catch {
+                                reader.cancel()
+                                break  // fall through to next provider
+                            }
+                            firstToken = false
+                        } else {
+                            readResult = await reader.read()
+                        }
+                        const { done, value } = readResult
                         if (done) {
                             break;
                         }
@@ -193,22 +215,27 @@ export default {
                                 console.error('[ask] stream error:', chunk.error)
                                 continue
                             }
-                            // Provider-agnostic text extraction via extract() — handles
-                            // Gemini (candidates[0].content.parts) and OpenRouter
-                            // (choices[0].delta.content / delta.reasoning).
-                            const text = upstream.extract(chunk)
+                            // OpenRouter reasoning models: reasoning → Thinking…,
+                            // content → visible answer.  Gemini: extract()
+                            // falls back to candidates[0].content.parts.
                             const reasoning = chunk.choices?.[0]?.delta?.reasoning || ''
                             const content = chunk.choices?.[0]?.delta?.content
-                            if (text) {
-                                emittedText = true
-                                await send({ text });
-                            }
-                            // Thinking… only when model streams BOTH reasoning
-                            // AND actual content (not reasoning as answer fallback).
-                            if (reasoning && content) {
+                            if (reasoning) {
                                 hadThinking = true
                                 thinkingText += reasoning
                                 await send({ thinking: reasoning });
+                            }
+                            if (content) {
+                                emittedText = true
+                                await send({ text: content });
+                            }
+                            // Non-OpenRouter fallback (Gemini, etc.)
+                            if (!reasoning && !content) {
+                                const text = upstream.extract(chunk)
+                                if (text) {
+                                    emittedText = true
+                                    await send({ text });
+                                }
                             }
                         }
                     }
@@ -217,13 +244,21 @@ export default {
                     if (!emittedText && hadThinking) {
                         await send({ text: thinkingText });
                     }
-                    if (!emittedText && !hadThinking && upstreamError) {
+                    // Provider produced output — stop trying others
+                    if (emittedText || hadThinking) {
+                        break  // exit provider chain, we got a response
+                    }
+                }  // end provider chain loop
+
+                // All providers exhausted with no output
+                if (!emittedText && !hadThinking) {
+                    if (upstreamError) {
                         await send({
                             text: `The model provider failed while streaming: ${upstreamError}`,
                         })
-                    } else if (!emittedText && !hadThinking) {
+                    } else {
                         await send({
-                            text: 'The model returned an empty stream. Please try again.',
+                            text: 'The assistant is temporarily over capacity. Please try again in a few minutes.',
                         })
                     }
                 }
@@ -245,6 +280,19 @@ export default {
 }
 
 /* ------------------------------ provider chain ----------------------------- */
+/** Wrap a fetch with a connection timeout — once the response headers arrive,
+ *  streaming can continue indefinitely.  Returns the response or throws. */
+async function fetchWithConnectTimeout(url, init, timeoutMs) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    try {
+        const res = await fetch(url, { ...init, signal: controller.signal })
+        return res
+    } finally {
+        clearTimeout(timer)
+    }
+}
+
 /* Each adapter returns { res, extract } on success, or null to fall through   */
 /* to the next provider (non-ok responses = quota/outage = fall through).      */
 
@@ -254,7 +302,7 @@ const PROVIDERS = {
             return null;
         }
         const model = env.GEMINI_MODEL || 'gemini-2.5-flash'
-        const res = await fetch(
+        const res = await fetchWithConnectTimeout(
             `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${env.GEMINI_API_KEY}`,
             {
                 method: 'POST',
@@ -271,6 +319,7 @@ const PROVIDERS = {
                     generationConfig: { temperature: 0.2 },
                 }),
             },
+            PROVIDER_CONNECT_MS,
         )
         if (!res.ok) {
             console.error('gemini', res.status, (await res.text()).slice(0, 200))
@@ -296,6 +345,7 @@ const PROVIDERS = {
         const body = {
             stream: true,
             temperature: 0.2,
+            reasoning: { enabled: true, exclude: false },
             messages: [
                 { role: 'system', content: system },
                 ...history.map((h) => ({
@@ -311,7 +361,7 @@ const PROVIDERS = {
         } else {
             body.model = models[0]
         }
-        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        const res = await fetchWithConnectTimeout('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -320,7 +370,7 @@ const PROVIDERS = {
                 'X-Title': env.BOT_NAME || 'gendoc-ask',
             },
             body: JSON.stringify(body),
-        })
+        }, PROVIDER_CONNECT_MS)
         if (!res.ok) {
             console.error('openrouter', res.status, (await res.text()).slice(0, 200))
             return null

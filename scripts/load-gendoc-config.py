@@ -14,7 +14,9 @@ Registered in mkdocs.yml via:
 
 import logging
 import os
+import re
 import shutil
+from pathlib import Path
 
 import yaml
 
@@ -86,14 +88,16 @@ def on_config(config):
         config["extra"]["generator"] = False
         logger.info("load_gendoc_config: generator = false")
 
-    # ── Logo ────────────────────────────────────────────────────────────
+    # ── Logo (copy into docs_dir so MkDocs produces a relative <img src>) ──
     project_logo = cfg.get("project", {}).get("logo")
     if project_logo:
         abs_logo = os.path.join(host_project_root, project_logo)
         if os.path.isfile(abs_logo):
-            config["theme"].logo = abs_logo
-            config["theme"]["logo"] = abs_logo
-            logger.info("load_gendoc_config: logo = %s", abs_logo)
+            dest = os.path.join(config["docs_dir"], os.path.basename(abs_logo))
+            shutil.copy2(abs_logo, dest)
+            config["theme"].logo = os.path.basename(abs_logo)
+            config["theme"]["logo"] = os.path.basename(abs_logo)
+            logger.info("load_gendoc_config: logo = %s (copied to docs_dir)", abs_logo)
         else:
             logger.warning("load_gendoc_config: logo not found at %s", abs_logo)
 
@@ -103,4 +107,26 @@ def on_config(config):
         config["site_dir"] = site_subdir
         logger.info("load_gendoc_config: site_dir = %s", site_subdir)
 
+    # Stash logo basename for post-build path fix
+    config["_logo_basename"] = config["theme"].get("logo", "")
+
     return config
+
+
+def on_post_build(config):
+    """Replace absolute logo paths in built HTML with relative basename."""
+    logo = config.get("_logo_basename", "")
+    if not logo:
+        return
+    site_dir = config["site_dir"]
+    count = 0
+    for html_file in Path(site_dir).rglob("*.html"):
+        content = html_file.read_text()
+        updated = re.sub(r'src="[^"]*' + re.escape(logo) + r'"',
+                         f'src="/{logo}"', content)
+        if updated != content:
+            html_file.write_text(updated)
+            count += 1
+    if count:
+        logger.info("load_gendoc_config: fixed logo src in %d files", count)
+

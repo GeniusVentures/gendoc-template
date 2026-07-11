@@ -200,7 +200,7 @@ export class DrawerUI {
             del.addEventListener("click", (e) => {
                 e.stopPropagation();
                 const id = del.dataset.del;
-                if (id && confirm('Delete this chat?')) {
+                if (id && this.confirmDelete()) {
                     this.sessions.deleteSession(id);
                 }
             });
@@ -213,6 +213,29 @@ export class DrawerUI {
             return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
         }
         return d.toLocaleDateString([], { month: "short", day: "numeric" });
+    }
+    confirmDelete() {
+        try {
+            if (localStorage.getItem('ask-skip-delete-confirm') === 'true') {
+                return true;
+            }
+        }
+        catch {
+            /* localStorage unavailable */
+        }
+        const ok = confirm('Delete this chat?');
+        if (ok) {
+            const skip = confirm("Don't ask again for this session?");
+            if (skip) {
+                try {
+                    localStorage.setItem('ask-skip-delete-confirm', 'true');
+                }
+                catch {
+                    /* localStorage unavailable */
+                }
+            }
+        }
+        return ok;
     }
     /* ----------------------------- transcript wiring ---------------------------- */
     onTranscriptEvent(event) {
@@ -282,9 +305,24 @@ export class DrawerUI {
                 }
                 thinkEl.lastElementChild.textContent = message.thinking;
                 thinkEl.open = false;
+                // Animate "Thinking…" dots while answer hasn't started
+                thinkEl.classList.toggle('streaming', !message.text || message.text === '…');
             }
             else if (thinkEl) {
                 thinkEl.remove();
+            }
+            // Provider badge
+            let providerEl = element.querySelector(".provider");
+            if (message.provider) {
+                if (!providerEl) {
+                    providerEl = document.createElement("span");
+                    providerEl.className = "provider";
+                    element.insertBefore(providerEl, body);
+                }
+                providerEl.textContent = message.provider;
+            }
+            else if (providerEl) {
+                providerEl.remove();
             }
             body.innerHTML = renderInlineMarkdown(message.text || "…");
         }

@@ -52,6 +52,10 @@ async function main(): Promise<void>
         {
           transcript.setSources(answerIndex, event.sources);
         }
+        if (event.provider !== undefined)
+        {
+          transcript.setProvider(answerIndex, event.provider);
+        }
         if (event.thinking !== undefined)
         {
           transcript.appendThinking(answerIndex, event.thinking);
