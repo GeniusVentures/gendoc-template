@@ -68,8 +68,10 @@ for key, value in values.items():
 PY
 )"
 
-# Substitute {{TOKENS}} into a generated config (gitignored build artifact).
-GENERATED="$TEMPLATE_ROOT/wrangler_ask.generated.toml"
+# Substitute {{TOKENS}} into wrangler-ask.toml (all deployable files live
+# under ask-ai/, so wrangler deploy runs from there and main=worker/ask.js
+# resolves naturally).
+GENERATED="$TEMPLATE_ROOT/ask-ai/wrangler-ask.toml"
 sed -e "s|{{WORKER_NAME}}|$WORKER_NAME|g" \
     -e "s|{{COMPATIBILITY_DATE}}|$COMPATIBILITY_DATE|g" \
     -e "s|{{LLMS_URL}}|$LLMS_URL|g" \
@@ -79,7 +81,7 @@ sed -e "s|{{WORKER_NAME}}|$WORKER_NAME|g" \
     -e "s|{{PROVIDERS}}|$PROVIDERS|g" \
     -e "s|{{GEMINI_MODEL}}|$GEMINI_MODEL|g" \
     -e "s|{{OPENROUTER_MODELS}}|$OPENROUTER_MODELS|g" \
-    "$TEMPLATE_ROOT/wrangler_ask_toml.template" > "$GENERATED"
+    "$TEMPLATE_ROOT/ask-ai/wrangler-ask.toml.template" > "$GENERATED"
 
 # When a custom endpoint is configured, append a [[routes]] section so
 # traffic to that domain+path reaches this worker (shared-worker scenario).
@@ -98,7 +100,7 @@ with open('$GENERATED', 'a') as f:
 fi
 
 echo "==> Deploying ask worker '$WORKER_NAME'"
-DEPLOY_OUTPUT=$(cd "$TEMPLATE_ROOT" && CLOUDFLARE_API_TOKEN="$CF_API_TOKEN" CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT_ID" \
+DEPLOY_OUTPUT=$(cd "$TEMPLATE_ROOT/ask-ai" && CLOUDFLARE_API_TOKEN="$CF_API_TOKEN" CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT_ID" \
   wrangler deploy --config "$GENERATED" 2>&1)
 echo "$DEPLOY_OUTPUT"
 
