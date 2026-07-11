@@ -14,7 +14,9 @@ export const STOPWORDS = new Set(
 );
 
 export function debug(...args: any[]) {
-  if ((globalThis as any).DEBUG) console.log('[ask:debug]', ...args);
+  if ((globalThis as any).DEBUG) {
+    console.log('[ask:debug]', ...args);
+  }
 }
 
 export const enc = (s: string) => new TextEncoder().encode(s);
@@ -28,12 +30,19 @@ export function json(obj: any, status = 200, cors: Record<string, string> = {}) 
 
 export function corsHeaders(request: Request, env: Env): Record<string, string> {
   const origin = request.headers.get('Origin') || '';
-  const allowed = (env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+  const allowed = (env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+
   const h: Record<string, string> = {
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
+    'Access-Control-Allow-Headers': 'Content-Type',
   };
-  if (allowed.includes(origin)) h['Access-Control-Allow-Origin'] = origin;
+
+  if (allowed.includes(origin)) {
+    h['Access-Control-Allow-Origin'] = origin;
+  }
   return h;
 }
 
@@ -44,8 +53,10 @@ export async function fetchWithConnectTimeout(
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    return res;
   } finally {
     clearTimeout(timer);
   }

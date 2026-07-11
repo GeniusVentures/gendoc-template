@@ -1,17 +1,8 @@
-# Wrangler configuration for the ask widget's Worker (/api/ask)
-# Generated from wrangler-ask.toml.template -- {{TOKENS}} are substituted
-# from gendoc.yml values by scripts/setup.sh. Do not edit the generated
-# file; edit gendoc.yml.
-#
-# This is a WORKER, deployed separately from the Pages site:
-#   gendoc-template/scripts/setup.sh
-# Secrets are set once, manually (never in any config file):
-#   wrangler secret put GEMINI_API_KEY     --name {{WORKER_NAME}}
-#   wrangler secret put OPENROUTER_API_KEY --name {{WORKER_NAME}}
-# Either provider may be omitted (no key = skipped in the chain).
+# Wrangler configuration for the Ask AI Worker.
+# The setup/deploy scripts substitute {{TOKENS}} from gendoc.yml.
 
 name = "{{WORKER_NAME}}"
-main = "worker/ask.js"
+main = "worker/src/index.ts"
 compatibility_date = "{{COMPATIBILITY_DATE}}"
 
 [vars]
@@ -22,3 +13,13 @@ BOT_NAME = "{{BOT_NAME}}"
 PROVIDERS = "{{PROVIDERS}}"
 GEMINI_MODEL = "{{GEMINI_MODEL}}"
 OPENROUTER_MODELS = "{{OPENROUTER_MODELS}}"
+
+# Optional Cloudflare Rate Limiting binding. Verify this syntax against the
+# Wrangler version used by the repository before enabling it in production.
+# [[ratelimits]]
+# binding = "ASK_RATE_LIMITER"
+# simple = { limit = 30, period = 60 }
+
+# Secrets are configured separately:
+#   wrangler secret put GEMINI_API_KEY
+#   wrangler secret put OPENROUTER_API_KEY
