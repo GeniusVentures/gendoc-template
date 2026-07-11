@@ -102,10 +102,9 @@ def on_config(config):
             logger.warning("load_gendoc_config: logo not found at %s", abs_logo)
 
     # ── Site directory ─────────────────────────────────────────────────────
-    site_subdir = cfg.get("mkdocs", {}).get("site_dir")
-    if site_subdir:
-        config["site_dir"] = site_subdir
-        logger.info("load_gendoc_config: site_dir = %s", site_subdir)
+    # build.sh passes --site-dir with an absolute path; do NOT override it
+    # here with the raw relative value from gendoc.yml, or on_post_build's
+    # logo-path fix resolves against CWD instead of the real output directory.
 
     # Stash logo basename for post-build path fix
     config["_logo_basename"] = config["theme"].get("logo", "")
