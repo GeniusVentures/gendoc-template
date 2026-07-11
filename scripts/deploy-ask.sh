@@ -35,13 +35,9 @@ else
 fi
 
 # Generate wrangler-ask.toml from template + gendoc.yml (always fresh for deploy)
+GENERATED="$TEMPLATE_ROOT/../wrangler-ask.toml"
 bash "$SCRIPT_DIR/generate-ask-config.sh" "$CONFIG" --force
-
-# Source computed values back (subshell-safe)
-VARS_FILE="$TEMPLATE_ROOT/ask-ai/.generated-vars"
-if [ -f "$VARS_FILE" ]; then
-    source "$VARS_FILE"
-fi
+source "$TEMPLATE_ROOT/../.generated-vars"
 
 echo "==> Deploying ask worker '$WORKER_NAME'"
 if [ "$USE_TOKEN_AUTH" = true ]; then
