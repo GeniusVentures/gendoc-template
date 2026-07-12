@@ -45,6 +45,12 @@ if ! command -v python3 &>/dev/null; then
     exit 1
 fi
 
+# ── Install gendoc-template plugins into the venv ─────────────────────────────
+PLUGINS_DIR="$TEMPLATE_ROOT/plugins"
+if [ -f "$PLUGINS_DIR/setup.py" ]; then
+    pip install --quiet -e "$PLUGINS_DIR"
+fi
+
 # ── Read gendoc.yml values ────────────────────────────────────────────────────
 echo "Reading gendoc.yml..."
 

@@ -162,7 +162,7 @@ echo "Serving site at $SITE_URL"
 echo "Press Ctrl-C to stop everything and restore ask-config.json."
 echo "------------------------------------------------------------"
 free_port "$SITE_PORT"
-cd "$SITE_DIR" && python3 -m http.server "$SITE_PORT" &
+cd "$SITE_DIR" && python3 -m http.server "$SITE_PORT" --protocol HTTP/1.1 &
 PID_SERVER=$!
 
 wait

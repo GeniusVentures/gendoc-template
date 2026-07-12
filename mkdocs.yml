@@ -53,6 +53,10 @@ plugins:
   - section-index
   - literate-nav:
       nav_file: SUMMARY_EXT.md
+  - external-docs:
+      sources:
+        - "../../SuperGenius/evmrelay/docs/rlpx/**/*.md"
+        - "../../SuperGenius/evmrelay/.planning/codebase/ARCHITECTURE.md"
 
 validation:
   links:

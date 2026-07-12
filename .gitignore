@@ -40,3 +40,4 @@ wrangler.toml
 ask-ai/.endpoint
 ask-ai/.dev.vars
 ask-ai/wrangler-ask.toml
+plugins/*.egg-info/
