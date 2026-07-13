@@ -73,8 +73,11 @@ if [ "$GZIP_JSON" = "True" ]; then
     # The fetch-gzip.js wrapper handles transparent decompression at runtime.
     count=$(find "$SITE_DIR" -name "*.json" -type f ! -name "*.json.gz" | wc -l | tr -d ' ')
     while IFS= read -r -d '' f; do
-        gzip -fk "$f" 2>/dev/null || true
-        rm "$f"
+        if gzip -fk "$f" 2>/dev/null; then
+            rm "$f"
+        else
+            echo "  Warning: gzip failed for ${f#$SITE_DIR/}, keeping uncompressed original" >&2
+        fi
     done < <(find "$SITE_DIR" -name "*.json" -type f ! -name "*.json.gz" -print0)
     echo "  Gzipped and removed $count .json files"
 else
