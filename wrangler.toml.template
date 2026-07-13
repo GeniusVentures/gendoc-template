@@ -6,7 +6,3 @@ name = "{{PAGES_PROJECT_NAME}}"
 compatibility_date = "{{COMPATIBILITY_DATE}}"
 pages_build_output_dir = "{{SITE_DIR}}"
 
-[site]
-bucket = "{{SITE_DIR}}"
-exclude = ["*.json"]
-
