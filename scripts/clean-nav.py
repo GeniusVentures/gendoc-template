@@ -69,14 +69,34 @@ def _rewrite_link_urls(item):
             _rewrite_link_urls(child)
 
 
+def _remove_orphaned_links(item):
+    """
+    Remove titleless Link children that literate-nav creates as leftover
+    parent links.  These orphans render as "None" entries in the sidebar.
+    Without navigation.sections, the section header itself is the toggle —
+    no synthetic index is needed.
+    """
+    children = getattr(item, "children", None)
+    if not children:
+        return
+
+    for child in children:
+        _remove_orphaned_links(child)
+
+    # Remove titleless Link children (null-title orphans from literate-nav).
+    item.children = [c for c in children
+                     if not (isinstance(c, Link)
+                             and getattr(c, "title", None) is None)]
+
+
 def _promote_section_indexes(item):
     """
     Recursively turn each Section's orphaned titleless child into its index.
 
     A titleless Link child (the leftover parent link) is promoted by setting
     `is_index = True`, which is the flag Material's nav template checks to
-    decide whether to render the section title as a link. Sections themselves
-    always carry a title, so legitimate sections are never affected.
+    decide whether to render the section title as a link.
+    Requires navigation.sections to be enabled.
     """
     children = getattr(item, "children", None)
     if not children:
@@ -98,9 +118,7 @@ def _promote_section_indexes(item):
     # If this item has children and an associated page URL but no existing
     # index child, synthesize a titleless Link so Material renders it as a
     # clickable section (an <a> next to the toggle arrow instead of a bare
-    # <label>).  Without this, Pages-with-children are only expandable,
-    # never navigable, and the <label class="md-nav__title"> duplicates the
-    # page title.
+    # <label>).
     url = getattr(item, "url", None)
     if not url:
         page = getattr(item, "page", None)
@@ -113,14 +131,21 @@ def _promote_section_indexes(item):
 
 
 def on_nav(nav, config, files):
-    """MkDocs hook entry point — rewrite Link urls then promote indexes.
+    """MkDocs hook entry point — rewrite Link urls then clean up orphans.
 
-    Only runs for non-GitBook projects (config.gitbook_mode is False or
-    absent).  GitBook projects use literate-nav with SectionPage items that
-    already carry their own URLs — adding synthetic indexes for those creates
-    blank entries that render as empty nav slots (e.g. FAQS disappearing).
+    When navigation.sections is enabled, promote titleless children to
+    section indexes so Material renders clickable section titles.  When
+    disabled (accordion mode), remove the orphans entirely — they would
+    render as "None" entries.
     """
+    features = config["theme"].get("features", [])
+    has_sections = "navigation.sections" in features
+
     for item in nav.items:
         _rewrite_link_urls(item)
-        _promote_section_indexes(item)
+        if has_sections:
+            _promote_section_indexes(item)
+        else:
+            _remove_orphaned_links(item)
+
     return nav

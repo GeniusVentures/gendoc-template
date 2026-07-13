@@ -72,6 +72,13 @@
         height: auto !important;
         max-height: none !important;
     }
+
+    /* Material sets overflow:hidden on the scrollwrap for drill-down nav,
+       but with navigation.sections enabled all sections are expanded.
+       Allow scrolling so items below the viewport aren't clipped. */
+    .md-sidebar--primary .md-sidebar__scrollwrap {
+        overflow-y: auto !important;
+    }
 }
 
 .md-main__inner > .md-content,
@@ -143,9 +150,14 @@
     }
 }
 
-/* ── Suppress duplicate nav title labels ──────────────────────────────────── */
-.md-nav__item--nested > .md-nav > .md-nav__title {
-    display: none;
+/* ── Suppress duplicate nav title labels (desktop only) ─────────────────────
+   On desktop all sections are visible so the back-navigation label inside
+   each nested <nav> duplicates the parent link.  On mobile the same label
+   IS the back button — without it you can't leave a drill-down level. */
+@media screen and (min-width: 76.25em) {
+    .md-nav__item--nested > .md-nav > .md-nav__title {
+        display: none;
+    }
 }
 
 /* ── GitBook image / figure alignment ─────────────────────────────────────── */

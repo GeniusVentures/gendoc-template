@@ -19,7 +19,6 @@ theme:
   name: material
   features:
     - navigation.indexes
-    - navigation.sections
     - navigation.top
     - navigation.footer
     - navigation.instant
