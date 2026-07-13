@@ -26,15 +26,17 @@ Usage:
 
 import argparse
 import contextlib
+import glob as glob_mod
 import hashlib
 import json
+import os
 import re
 import shutil
 import signal
 import sys
 import urllib.request
 import xml.etree.ElementTree as ET
-from pathlib import Path
+from pathlib import Path, PurePath
 
 with contextlib.suppress(AttributeError, ValueError):  # no SIGPIPE on Windows
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
