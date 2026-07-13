@@ -20,7 +20,14 @@ class RemoteTransport {
             body: JSON.stringify(body),
         });
         if (!res.ok || res.body === null) {
-            throw new Error(`ask endpoint returned HTTP ${res.status}`);
+            let message = `ask endpoint returned HTTP ${res.status}`;
+            try {
+                const body = await res.json();
+                if (body.error)
+                    message = body.error;
+            }
+            catch { /* response may not be JSON */ }
+            throw new Error(message);
         }
         yield* parseSseStream(res.body);
     }

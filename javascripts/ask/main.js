@@ -53,7 +53,7 @@ async function main() {
         }
         catch (error) {
             console.error("[ask-widget]", error);
-            transcript.setText(answerIndex, "Sorry — something went wrong. Please try again.");
+            transcript.setText(answerIndex, error instanceof Error ? error.message : "Sorry — something went wrong. Please try again.");
         }
         finally {
             busy = false;
