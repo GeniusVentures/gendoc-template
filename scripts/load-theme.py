@@ -9,7 +9,7 @@ Supported gendoc.yml block:
 
     theme:
       name: "protocol"        # one of the presets shipped in themes/*.css
-                               # (currently: "default", "protocol"), or "custom"
+                               # ("default", "indigo", "protocol"), or "custom"
       custom_css: ""          # required when name == "custom" — path to your
                                # own CSS file, relative to the HOST PROJECT ROOT
 
@@ -38,7 +38,18 @@ import yaml
 
 logger = logging.getLogger("mkdocs")
 
-BUILTIN_PRESETS = ("default", "protocol")
+BUILTIN_PRESETS = ("default", "indigo", "protocol")
+
+
+def _configure_material_features(config, name):
+    """Apply the small Material feature changes required by a preset."""
+    features = config["theme"]["features"]
+    if name == "protocol":
+        # Protocol nests the active page's headings below its left-nav entry.
+        if "toc.integrate" not in features:
+            features.append("toc.integrate")
+    elif "toc.integrate" in features:
+        features.remove("toc.integrate")
 
 
 def _load_gendoc_yml(host_project_root):
@@ -101,6 +112,8 @@ def on_config(config):
             logger.warning("load_theme: preset file %s missing — using 'default'.", preset_path)
             name = "default"
         stylesheets.append(f"/themes/{name}.css")
+
+    _configure_material_features(config, name)
 
     config["extra_css"] = stylesheets
     logger.info("load_theme: extra_css = %s", stylesheets)

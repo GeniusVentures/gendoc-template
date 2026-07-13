@@ -1,0 +1,154 @@
+name: Build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  site:
+    name: Site (${{ matrix.theme }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        theme:
+          - default
+          - indigo
+          - protocol
+
+    steps:
+      - name: Checkout template
+        uses: actions/checkout@v4
+        with:
+          path: gendoc-template
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: gendoc-template/requirements.txt
+
+      - name: Install documentation dependencies
+        run: |
+          python -m pip install -r gendoc-template/requirements.txt
+          python -m pip install -e gendoc-template/plugins
+
+      - name: Create parent-project fixture
+        env:
+          THEME: ${{ matrix.theme }}
+        run: |
+          mkdir -p docs
+          cat > gendoc.yml <<YAML
+          project:
+            name: "GenDoc CI"
+          paths:
+            handwritten_docs: "docs"
+          mkdocs:
+            site_dir: "site"
+            strict: false
+          theme:
+            name: "$THEME"
+          navigation:
+            navigation_sections: false
+          llms:
+            enabled: false
+          YAML
+          cat > docs/index.md <<'MARKDOWN'
+          # GenDoc CI
+
+          This fixture verifies the parent-project theme configuration.
+
+          ## Components
+
+          - [Guide](guide.md)
+          MARKDOWN
+          cat > docs/guide.md <<'MARKDOWN'
+          # Guide
+
+          ```cpp
+          int main() { return 0; }
+          ```
+
+          !!! note
+              Theme component smoke test.
+          MARKDOWN
+          cat > docs/SUMMARY_EXT.md <<'MARKDOWN'
+          - [Home](index.md)
+          - [Guide](guide.md)
+          MARKDOWN
+
+      - name: Build documentation
+        run: >-
+          mkdocs build
+          --config-file gendoc-template/mkdocs.yml
+          --site-dir "$GITHUB_WORKSPACE/site-${{ matrix.theme }}"
+
+      - name: Verify selected theme
+        env:
+          THEME: ${{ matrix.theme }}
+        run: |
+          test -f "site-$THEME/index.html"
+          test -f "site-$THEME/themes/$THEME.css"
+          grep -q "/stylesheets/base.css" "site-$THEME/index.html"
+          grep -q "/themes/$THEME.css" "site-$THEME/index.html"
+
+      - name: Upload site
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-${{ matrix.theme }}
+          path: site-${{ matrix.theme }}
+          if-no-files-found: error
+
+  ask-worker:
+    name: Ask worker
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout template
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ask-ai/worker/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefix ask-ai/worker
+
+      - name: Typecheck worker
+        run: npm run typecheck --prefix ask-ai/worker
+
+      - name: Check browser JavaScript syntax
+        run: |
+          node --check javascripts/ask/main.js
+          node --check javascripts/ask/transport.js
+
+  python:
+    name: Python
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout template
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compile scripts and hooks
+        run: python -m compileall -q scripts plugins

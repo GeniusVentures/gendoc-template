@@ -96,6 +96,46 @@
   --ask-dark-muted-fg: #8fa1b0;
 }
 
+/* ── Mobile hamburger and drill-down drawer ──────────────────────────────── */
+.md-header__button[for="__drawer"] {
+  width: 34px;
+  height: 34px;
+  margin-right: 8px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, .35);
+  border-radius: 8px;
+  color: var(--md-primary-bg-color) !important;
+  background: rgba(255, 255, 255, .12);
+  box-sizing: border-box;
+}
+.md-header__button[for="__drawer"]:hover {
+  background: rgba(255, 255, 255, .2);
+}
+.md-header__button[for="__drawer"] svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+@media screen and (max-width: 76.234375em) {
+  .md-sidebar--primary {
+    background: var(--md-default-bg-color);
+  }
+  .md-nav--primary .md-nav__title {
+    border-bottom: 1px solid var(--md-default-fg-color--lightest);
+  }
+  .md-nav--primary > .md-nav__list,
+  .md-nav--primary .md-nav > .md-nav__list {
+    padding: .65rem .45rem 1.5rem;
+    background: var(--md-default-bg-color);
+  }
+  .md-nav--primary .md-nav__link {
+    margin: .08rem 0;
+    padding: .45rem .65rem;
+    border-radius: 8px;
+  }
+}
+
 .md-logo img {
   filter: brightness(.5) saturate(20);
 }

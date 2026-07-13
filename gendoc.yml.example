@@ -24,7 +24,7 @@ mkdocs:
 
 # ── Theme selection ──────────────────────────────────────────────────────────
 theme:
-  name: "protocol"                            # built-in presets: "default" (original cyan) | "protocol" (new)
+  name: "protocol"                            # built-ins: "default" (cyan) | "indigo" | "protocol" (emerald)
                                               # use "custom" + custom_css below to bring your own
   # custom_css: "my-theme.css"                # path relative to HOST PROJECT ROOT, used when name == "custom"
 
@@ -70,6 +70,10 @@ source_references:
 # Configure how the root navigation (SUMMARY_EXT.md) is built from hand-written
 # docs and the generated source reference sets.
 navigation:
+  # Default false: nested sections use the mobile-friendly hamburger/drill-down
+  # accordion. Set true for an always-expanded desktop section list.
+  navigation_sections: false
+
   # Set true to regenerate index.md from index.md.template + heading structures
   # during the build. Requires index.md.template in the hand-written docs dir.
   generate_index: false
@@ -116,11 +120,11 @@ llms:
       title: "Architecture & Developer Reference"
       categories: [technical, architecture, api, nodes]
 
- related_catalogs:
-   - url: "https://otherdocs.mysite.com/llms.txt"
-     title: "My Other Docs"
-     description: "My other docs related to base documents"
-     audiences: [llms-technical.txt, llms-sales.txt]
+  related_catalogs:
+    - url: "https://otherdocs.mysite.com/llms.txt"
+      title: "My Other Docs"
+      description: "My other docs related to base documents"
+      audiences: [llms-technical.txt, llms-sales.txt]
 
   # -- Ask AI Widget (optional) -------------------------------------------------
   # Floating "Ask" button + chat drawer that answers questions only from your
