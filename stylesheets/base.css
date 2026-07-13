@@ -55,14 +55,14 @@
     }
 
     .md-main__inner > .md-sidebar--primary {
-        flex: 0 0 var(--gnus-sidebar-width);
+        flex: 0 0 var(--gnus-sidebar-width) !important;
     }
 
     .md-sidebar--primary {
-        position: relative;
-        width: var(--gnus-sidebar-width);
-        min-width: var(--gnus-sidebar-width);
-        max-width: var(--gnus-sidebar-width);
+        position: relative !important;
+        width: var(--gnus-sidebar-width) !important;
+        min-width: var(--gnus-sidebar-width) !important;
+        max-width: var(--gnus-sidebar-width) !important;
     }
 }
 
@@ -76,9 +76,9 @@
 
 .md-main__inner > .md-content,
 .md-main__inner > .md-grid {
-    flex: 1 1 auto;
-    min-width: 0;
-    margin-left: 10px;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    margin-left: 10px !important;
 }
 
 .md-main__inner > .md-content > .md-content__inner,
@@ -97,17 +97,17 @@
     }
 
     .md-sidebar--primary {
-        padding-top: 0;
-        padding-bottom: 2.5rem;
-        overflow: hidden;
-        overscroll-behavior: contain;
+        padding-top: 0 !important;
+        padding-bottom: 2.5rem !important;
+        overflow: hidden !important;
+        overscroll-behavior: contain !important;
     }
 
     .md-sidebar--primary .md-sidebar__scrollwrap {
-        width: 100%;
-        overflow-y: auto;
-        overflow-x: hidden;
-        overscroll-behavior: contain;
+        width: 100% !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        overscroll-behavior: contain !important;
     }
 
     .md-sidebar--primary .md-sidebar__inner {
@@ -121,9 +121,9 @@
     .md-sidebar--primary .md-nav--integrated,
     .md-sidebar--primary .md-nav.md-nav--primary,
     .md-sidebar--primary .md-nav.md-nav--integrated {
-        width: 100%;
-        max-width: none;
-        box-sizing: border-box;
+        width: 100% !important;
+        max-width: none !important;
+        box-sizing: border-box !important;
     }
 
     .gnus-sidebar-resizer {
