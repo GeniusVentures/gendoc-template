@@ -39,30 +39,18 @@ if ! wrangler whoami &>/dev/null; then
     exit 1
 fi
 
-# ── Read project name for display ────────────────────────────────────────────
-PROJECT_NAME=$(python3 -c "
+# ── Read configuration from gendoc.yml (single parse → three values) ──────────
+read -r PROJECT_NAME DEPLOY_BRANCH GZIP_JSON <<< "$(python3 -c "
 import yaml, sys
 with open(sys.argv[1], 'r') as f:
     cfg = yaml.safe_load(f)
-print(cfg.get('project', {}).get('name', ''), end='')
-" "$GENDOC_YML")
+name = cfg.get('project', {}).get('name', '')
+branch = cfg.get('deploy', {}).get('cloudflare', {}).get('branch', 'main')
+gzip = cfg.get('deploy', {}).get('cloudflare', {}).get('gzip_json', True)
+print(name, branch, gzip)
+" "$GENDOC_YML")"
 
 echo "Deploying ${PROJECT_NAME:-(unnamed)} to Cloudflare Pages..."
-
-# ── Read deploy configuration ─────────────────────────────────────────────────
-DEPLOY_BRANCH=$(python3 -c "
-import yaml, sys
-with open(sys.argv[1], 'r') as f:
-    cfg = yaml.safe_load(f)
-print(cfg.get('deploy', {}).get('cloudflare', {}).get('branch', 'main'), end='')
-" "$GENDOC_YML")
-
-GZIP_JSON=$(python3 -c "
-import yaml, sys
-with open(sys.argv[1], 'r') as f:
-    cfg = yaml.safe_load(f)
-print(cfg.get('deploy', {}).get('cloudflare', {}).get('gzip_json', True), end='')
-" "$GENDOC_YML")
 
 # ── Prepare files for Cloudflare Pages (25 MiB per-file upload limit) ────────
 echo "Preparing files for deployment..."
