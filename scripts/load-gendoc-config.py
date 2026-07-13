@@ -131,6 +131,37 @@ def on_config(config):
             features.remove("navigation.indexes")
             logger.info("load_gendoc_config: navigation_indexes = false (feature removed)")
 
+    # ── External docs plugin sources ──────────────────────────────────────
+    # Inject external_docs.sources from gendoc.yml into the external-docs
+    # plugin config so sources are managed in one place (gendoc.yml) rather
+    # than duplicated in mkdocs.yml.
+    ext_docs = cfg.get("external_docs", {})
+    ext_sources = ext_docs.get("sources", [])
+    if ext_sources:
+        # Resolve paths relative to the host project root (where gendoc.yml lives).
+        # Sources may be plain glob strings or dicts with label + paths.
+        resolved = []
+        for src in ext_sources:
+            if isinstance(src, dict):
+                paths = src.get("paths", [])
+            else:
+                paths = [src]
+            for pattern in paths:
+                resolved.append(os.path.join(host_project_root, pattern))
+        # Find the external-docs plugin and update its sources.
+        # Use clear+extend in-place to ensure the list reference is shared
+        # with the plugin instance (direct assignment may not propagate).
+        for plugin in config["plugins"]:
+            if hasattr(plugin, "config") and "sources" in plugin.config:
+                existing = plugin.config["sources"]
+                existing.clear()
+                existing.extend(resolved)
+                logger.info(
+                    "load_gendoc_config: external_docs sources injected (%d patterns)",
+                    len(resolved),
+                )
+                break
+
     return config
 
 

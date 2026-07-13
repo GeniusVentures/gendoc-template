@@ -315,6 +315,46 @@ for sr in cfg.get("source_references", []) or []:
             "is_set": True,
         })
 
+# ── external-docs plugin sources ──────────────────────────────────────────
+# The external-docs MkDocs plugin injects markdown files from outside the
+# docs directory into the build.  Read sources from gendoc.yml so everything
+# is configured in one place (paths are relative to the host project root).
+
+HOST_ROOT = str(TEMPLATE_ROOT.parent)
+ext_docs = cfg.get("external_docs", {})
+ext_sources = ext_docs.get("sources", [])
+if ext_sources:
+    for src in ext_sources:
+        if isinstance(src, dict):
+            group_label = src.get("label", "")
+            paths = src.get("paths", [])
+        else:
+            group_label = ""
+            paths = [src]
+        for pattern in paths:
+            abs_pattern = os.path.join(HOST_ROOT, pattern)
+            for fpath in sorted(glob_mod.glob(abs_pattern, recursive=True)):
+                if not fpath.endswith((".md", ".markdown")):
+                    continue
+                p = Path(fpath)
+                rel = os.path.relpath(fpath, str(TEMPLATE_ROOT))
+                # Strip leading ".." segments to build src_uri matching
+                # the external-docs plugin's on_files logic.
+                parts = [part for part in PurePath(rel).parts if part != ".."]
+                src_uri = "/".join(parts)
+                if src_uri in seen:
+                    continue
+                seen.add(src_uri)
+                content = p.read_text()
+                entries.append({
+                    "key": f"external:{src_uri}",
+                    "url": doc_url(src_uri, use_dir_urls),
+                    "title": p.stem.replace("-", " ").replace("_", " "),
+                    "words": word_count(content),
+                    "content": content,
+                    "section": f"External: {group_label}" if group_label else "External Documentation",
+                })
+
 # --------------------------------------------------------------------------- #
 # 3. reconcile with editorial metadata
 # --------------------------------------------------------------------------- #

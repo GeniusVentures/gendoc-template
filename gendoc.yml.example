@@ -22,6 +22,12 @@ mkdocs:
   use_directory_urls: true                    # Clean URLs without .html extension
   strict: false                               # Build with --strict (warnings become errors)
 
+# ── Theme selection ──────────────────────────────────────────────────────────
+theme:
+  name: "protocol"                            # built-in presets: "default" (original cyan) | "protocol" (new)
+                                              # use "custom" + custom_css below to bring your own
+  # custom_css: "my-theme.css"                # path relative to HOST PROJECT ROOT, used when name == "custom"
+
 # ── Doxygen configuration (shared by all source reference sets) ─────────────
 doxygen:
   output_dir: "gendoc-template/doxygen-output" # Intermediate XML output directory (gitignored)

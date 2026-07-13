@@ -1,0 +1,166 @@
+/*
+ * base.css
+ *
+ * Theme-agnostic structural rules for MkDocs Material + Ask AI Drawer.
+ * Loaded before every theme preset (see themes/*.css) — contains no colors,
+ * only layout mechanics that every theme should share. Palette, fonts, and
+ * component skinning live in the selected themes/<name>.css file instead.
+ */
+
+/* ── Sidebar viewport sizing fix ──────────────────────────────────────────── */
+:root {
+    --gnus-sidebar-width: 16rem;
+}
+
+.md-main__inner {
+    width: 100% !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+@media screen and (min-width: 76.25em) {
+    .md-container {
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+        height: calc(100vh - 2.4rem);
+        overflow: hidden;
+    }
+
+    .md-main {
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .md-main__inner {
+        height: 100%;
+        min-height: 0;
+        margin-top: 0;
+        padding-top: 1.5rem;
+        overflow: hidden;
+    }
+
+    .md-sidebar--primary,
+    .md-sidebar--primary .md-sidebar__scrollwrap,
+    .md-content {
+        height: 100% !important;
+        max-height: 100% !important;
+        min-height: 0;
+    }
+
+    .md-content {
+        overflow-y: auto;
+        overflow-x: hidden;
+        overscroll-behavior: contain;
+    }
+
+    .md-main__inner > .md-sidebar--primary {
+        flex: 0 0 var(--gnus-sidebar-width);
+    }
+
+    .md-sidebar--primary {
+        position: relative;
+        width: var(--gnus-sidebar-width);
+        min-width: var(--gnus-sidebar-width);
+        max-width: var(--gnus-sidebar-width);
+    }
+}
+
+@media screen and (max-width: 76.234375em) {
+    /* Keep the root drawer nav list expanded to intrinsic height on mobile. */
+    .md-sidebar--primary .md-nav--primary > .md-nav__list {
+        height: auto !important;
+        max-height: none !important;
+    }
+}
+
+.md-main__inner > .md-content,
+.md-main__inner > .md-grid {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-left: 10px;
+}
+
+.md-main__inner > .md-content > .md-content__inner,
+.md-main__inner > .md-grid,
+.md-main__inner .md-grid {
+    margin-left: 20px !important;
+    margin-right: 20px !important;
+    max-width: none !important;
+}
+
+@media screen and (min-width: 76.25em) {
+    .md-sidebar--primary,
+    .md-sidebar--primary .md-sidebar__scrollwrap,
+    .md-sidebar--primary .md-sidebar__inner {
+        min-height: 0;
+    }
+
+    .md-sidebar--primary {
+        padding-top: 0;
+        padding-bottom: 2.5rem;
+        overflow: hidden;
+        overscroll-behavior: contain;
+    }
+
+    .md-sidebar--primary .md-sidebar__scrollwrap {
+        width: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+        overscroll-behavior: contain;
+    }
+
+    .md-sidebar--primary .md-sidebar__inner {
+        width: 100%;
+        padding: 0 0.2rem !important;
+        box-sizing: border-box;
+        overflow: visible;
+    }
+
+    .md-sidebar--primary .md-nav--primary,
+    .md-sidebar--primary .md-nav--integrated,
+    .md-sidebar--primary .md-nav.md-nav--primary,
+    .md-sidebar--primary .md-nav.md-nav--integrated {
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
+    }
+
+    .gnus-sidebar-resizer {
+        position: absolute;
+        top: 0;
+        right: -0.25rem;
+        width: 0.5rem;
+        height: 100%;
+        cursor: col-resize;
+        z-index: 20;
+    }
+
+    body.gnus-sidebar-resizing,
+    body.gnus-sidebar-resizing * {
+        cursor: col-resize !important;
+        user-select: none !important;
+    }
+}
+
+/* ── Suppress duplicate nav title labels ──────────────────────────────────── */
+.md-nav__item--nested > .md-nav > .md-nav__title {
+    display: none;
+}
+
+/* ── GitBook image / figure alignment ─────────────────────────────────────── */
+.md-typeset figure                        { display:block; margin:1rem auto; text-align:center; }
+.md-typeset figure img                    { display:inline-block; }
+
+.md-typeset div[align="left"]             { text-align:left; }
+.md-typeset div[align="left"] figure,
+.md-typeset div[align="left"] img         { display:inline-block; margin:0; }
+
+.md-typeset div[align="center"]           { text-align:center; }
+
+.md-typeset div[data-full-width="true"]   { width:100%; text-align:left; }
+.md-typeset div[data-full-width="true"] figure { display:block; width:100%; margin:1rem 0; }
+.md-typeset div[data-full-width="true"] img:not([width]) { width:100%; max-width:100%; display:block; }
+
+/* ── Content bottom margin ───────────────────────────────────────────────── */
+.md-content__inner { padding-bottom: 4rem; }

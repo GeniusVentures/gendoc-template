@@ -5,6 +5,7 @@ use_directory_urls: true
 
 hooks:
   - scripts/load-gendoc-config.py
+  - scripts/load-theme.py
   - scripts/clean-nav.py
   - scripts/copy-assets.py
   - scripts/rewrite_gitbook_paths.py
@@ -12,6 +13,7 @@ hooks:
 watch:
   - javascripts
   - stylesheets
+  - themes
 
 theme:
   name: material
@@ -27,7 +29,6 @@ theme:
     - search.highlight
     - content.tabs
     - content.code.copy
-    - toc.integrate
 
   palette:
     # Light mode — custom scheme so CSS variables control all colors
@@ -55,8 +56,8 @@ plugins:
       nav_file: SUMMARY_EXT.md
   - external-docs:
       sources:
-        - "../../SuperGenius/evmrelay/docs/rlpx/**/*.md"
         - "../../SuperGenius/evmrelay/.planning/codebase/ARCHITECTURE.md"
+        - "../../SuperGenius/evmrelay/docs/rlpx/**/*.md"
 
 validation:
   links:
@@ -86,9 +87,6 @@ markdown_extensions:
   - admonition
   - attr_list
   - md_in_html
-
-extra_css:
-  - /stylesheets/theme.css
 
 extra_javascript:
   - https://unpkg.com/mermaid@10/dist/mermaid.min.js
