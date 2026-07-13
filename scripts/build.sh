@@ -156,24 +156,6 @@ echo "  Step 6: Generating llms.txt agent catalogs"
 echo "=============================================="
 python3 "$SCRIPT_DIR/build-llms.py" "$@"
 
-# ── Step 7: Gzip JSON for Cloudflare Pages (25 MiB per-file upload limit) ────
-echo ""
-echo "=============================================="
-echo "  Step 7:  Gzipping JSON for deployment"
-echo "=============================================="
-
-HEADERS_FILE="$SITE_DIR_ABS/_headers"
-echo "# Cloudflare Pages — pre-compressed JSON" > "$HEADERS_FILE"
-
-while IFS= read -r -d '' f; do
-    rel="${f#$SITE_DIR_ABS/}"
-    gzip -f "$f" 2>/dev/null || true
-    echo "/$rel" >> "$HEADERS_FILE"
-    echo "  Content-Encoding: gzip" >> "$HEADERS_FILE"
-done < <(find "$SITE_DIR_ABS" -name "*.json" -type f -print0)
-
-echo "  Gzipped JSON files + wrote _headers"
-
 # ── Success ───────────────────────────────────────────────────────────────────
 echo ""
 echo "=============================================="

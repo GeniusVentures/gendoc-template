@@ -69,8 +69,13 @@ async function loadVocab(env: Env, origin: string) {
   const cached = cache.get(origin);
   if (cached) return cached;
 
-  const url = new URL('/data/search-vocab.json', origin).href;
-  const res = await fetch(url, { cf: { cacheTtl: 86400, cacheEverything: true } });
+  // Try gzipped first (Cloudflare Pages), fall back to plain (local dev)
+  let res = await fetch(new URL('/data/search-vocab.json.gz', origin).href,
+    { cf: { cacheTtl: 86400, cacheEverything: true } });
+  if (!res.ok) {
+    res = await fetch(new URL('/data/search-vocab.json', origin).href,
+      { cf: { cacheTtl: 86400, cacheEverything: true } });
+  }
   if (!res.ok) throw new Error(`Failed to load vocab: ${res.status}`);
   const data: SearchVocab = await res.json();
 

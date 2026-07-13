@@ -148,8 +148,16 @@ async function loadContentMap(env: Env, origin: string): Promise<Record<string, 
   if (cached) return cached;
 
   try {
-    const url = new URL('/content-map.json', origin).href;
-    const contentMap = await fetchText(url).then(JSON.parse);
+    // Try gzipped first (Cloudflare Pages), fall back to plain (local dev)
+    let res = await fetch(new URL('/content-map.json.gz', origin).href);
+    let data: Record<string, string>;
+    if (res.ok) {
+      data = await res.json();
+    } else {
+      res = await fetch(new URL('/content-map.json', origin).href);
+      data = await res.json();
+    }
+    const contentMap = data;
     contentMapCache.set(origin, contentMap);
     return contentMap;
   } catch {
