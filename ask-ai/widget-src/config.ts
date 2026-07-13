@@ -16,14 +16,19 @@ export const STORAGE_KEY = "gendoc-ask-transcript";
 export const CONFIG_URL = "/ask-config.json";
 
 /**
- * Load /ask-config.json. Returns null when the file is absent, malformed,
- * or disabled -- the caller treats null as "do not install the widget".
+ * Load /ask-config.json.gz, falling back to /ask-config.json for local dev.
+ * Handles the case where the server doesn't set Content-Encoding: gzip
+ * (the response body is still compressed — decompress before parsing).
+ * Returns null when the file is absent, malformed, or disabled --
+ * the caller treats null as "do not install the widget".
  */
 export async function loadAskConfig(): Promise<AskConfig | null> {
   try {
     const res = await fetch(CONFIG_URL, { cache: "no-cache" });
     if (!res.ok) return null;
-    const raw: unknown = await res.json();
+
+    const body = await res.arrayBuffer();
+    const raw: unknown = JSON.parse(new TextDecoder().decode(body));
     if (typeof raw !== "object" || raw === null) return null;
     const cfg = raw as Partial<AskConfig>;
     if (!cfg.enabled) return null;
