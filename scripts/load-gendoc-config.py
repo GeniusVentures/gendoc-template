@@ -138,6 +138,20 @@ def on_config(config):
             features.append("navigation.sections")
             logger.info("load_gendoc_config: navigation_sections = true (feature added)")
 
+    # ── fetch-gzip.js injection (deploy.cloudflare.gzip_json toggle) ──────
+    # When gzip_json is true (the default), inject fetch-gzip.js at the front
+    # of extra_javascript so it loads before any other script that calls
+    # fetch().  The wrapper intercepts ALL .json fetches on the main thread,
+    # rewriting them to .json.gz with transparent gzip decompression.
+    # When gzip_json is false the wrapper is never loaded — zero overhead,
+    # no interception.
+    gzip_json = cfg.get("deploy", {}).get("cloudflare", {}).get("gzip_json", True)
+    if gzip_json:
+        config["extra_javascript"].insert(0, "/javascripts/fetch-gzip.js")
+        logger.info("load_gendoc_config: fetch-gzip.js injected (gzip_json=true)")
+    else:
+        logger.info("load_gendoc_config: gzip_json=false — fetch-gzip.js not injected")
+
     # ── External docs plugin sources ──────────────────────────────────────
     # Inject external_docs.sources from gendoc.yml into the external-docs
     # plugin config so sources are managed in one place (gendoc.yml) rather
