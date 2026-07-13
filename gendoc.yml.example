@@ -87,6 +87,8 @@ deploy:
   cloudflare:
     pages_project_name: "myproject-docs"       # Wrangler pages project name
     production_branch: "main"                  # Git branch that triggers production deploy
+    branch: "main"                             # Branch alias for wrangler pages deploy (default "main")
+    gzip_json: true                            # Gzip .json files before deploy (Cloudflare Pages 25 MiB per-file limit). Set false if not using Cloudflare Pages.
     custom_domain: ""                          # Optional: custom domain (e.g. docs.example.com)
     compatibility_date: "2024-01-01"           # Cloudflare compatibility date
     # Authenticate once with: wrangler login
