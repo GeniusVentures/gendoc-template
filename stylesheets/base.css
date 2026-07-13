@@ -150,9 +150,14 @@
     }
 }
 
-/* ── Suppress duplicate nav title labels ──────────────────────────────────── */
-.md-nav__item--nested > .md-nav > .md-nav__title {
-    display: none;
+/* ── Suppress duplicate nav title labels (desktop only) ─────────────────────
+   On desktop all sections are visible so the back-navigation label inside
+   each nested <nav> duplicates the parent link.  On mobile the same label
+   IS the back button — without it you can't leave a drill-down level. */
+@media screen and (min-width: 76.25em) {
+    .md-nav__item--nested > .md-nav > .md-nav__title {
+        display: none;
+    }
 }
 
 /* ── GitBook image / figure alignment ─────────────────────────────────────── */
