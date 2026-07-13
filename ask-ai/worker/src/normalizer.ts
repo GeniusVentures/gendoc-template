@@ -143,5 +143,5 @@ export async function extractTerms(env: Env, question: string, origin: string): 
 
   // Union: original + corrected (so misspellings still match raw content)
   const expanded = [...new Set([...rawTokens.map(t => t.toLowerCase()), ...corrected])];
-  return expanded.filter(t => t.length >= 2);
+  return expanded.filter(t => t.length >= 2 && !STOPWORDS.has(t) && !additionalStopwords.has(t));
 }
