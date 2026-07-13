@@ -437,7 +437,152 @@ def _write_readme(src_dir, categories, label, language=""):
     print(f"Source reference README written to {readme_path}")
 
 
-def write_root_nav(docs_dir, sets, nav_config):
+def _resolve_external_docs_entries(cfg, template_root, source_label=None):
+    """
+    Expand external_docs.sources globs and return (title, url) tuples for
+    nav entries.  URLs are computed the same way the external-docs MkDocs
+    plugin does: path relative to template_root, strip ``..`` segments,
+    then apply use_directory_urls logic.
+
+    When *source_label* is given, only source groups whose ``label`` matches
+    are included — plain-string sources (no label) are included only when
+    *source_label* is ``"external_docs"`` or ``None``.
+    """
+    ext_docs = cfg.get("external_docs", {})
+    sources = ext_docs.get("sources", [])
+    if not sources:
+        return []
+
+    use_dir_urls = cfg.get("mkdocs", {}).get("use_directory_urls", True)
+    host_root = os.path.dirname(template_root)
+    entries = []
+
+    for src in sources:
+        if isinstance(src, dict):
+            if source_label and src.get("label") != source_label:
+                continue
+            paths = src.get("paths", [])
+        else:
+            if source_label and source_label != "external_docs":
+                continue
+            paths = [src]
+        for pattern in paths:
+            abs_pattern = os.path.join(host_root, pattern)
+            for fpath in sorted(glob.glob(abs_pattern, recursive=True)):
+                if not os.path.isfile(fpath):
+                    continue
+                if not fpath.endswith((".md", ".markdown")):
+                    continue
+
+                # Build src_uri matching the external-docs plugin on_files logic.
+                rel = os.path.relpath(fpath, template_root)
+                parts = [p for p in rel.replace("\\", "/").split("/") if p != ".."]
+                src_uri = "/".join(parts)
+
+                # Compute URL from src_uri.
+                if src_uri.endswith(".md"):
+                    src_uri = src_uri[:-3]
+                elif src_uri.endswith(".markdown"):
+                    src_uri = src_uri[:-9]
+                if use_dir_urls:
+                    basename = os.path.basename(src_uri)
+                    if basename in ("index", "README"):
+                        src_uri = os.path.dirname(src_uri)
+                        if src_uri:
+                            src_uri += "/"
+                    else:
+                        src_uri += "/"
+
+                # Read H1 for title, fallback to stem.
+                title = None
+                try:
+                    with open(fpath, "r", encoding="utf-8") as fh:
+                        for line in fh:
+                            line = line.strip()
+                            if line.startswith("# ") and not line.startswith("## "):
+                                title = line[2:].strip()
+                                break
+                except Exception:
+                    pass
+                if not title:
+                    title = os.path.splitext(os.path.basename(fpath))[0]
+                    title = title.replace("-", " ").replace("_", " ")
+
+                entries.append((title, src_uri))
+
+    return entries
+
+
+def _insert_nav_gitbook(content, target_label, entries, *, where="after",
+                        wrapper_label=None):
+    """
+    Insert *entries* into gitbook-mode nav text before/after the block
+    matching *target_label* (including its children at deeper indent).
+
+    Each entry is a ``(title, url)`` tuple.  When *wrapper_label* is set,
+    entries are nested under a parent labelled *wrapper_label*; otherwise
+    they are inserted flat at the same indent as the target.
+    """
+    lines = content.split("\n")
+    target_idx = None
+    target_indent = 0
+
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        # Match:  "- Label" or "- [Label](url)"  at any indent.
+        m = re.match(r"^(\s*)- (?:\[([^\]]+)\]\([^)]*\)|(.+))$", line)
+        if m:
+            label = (m.group(2) or m.group(3) or "").strip()
+            if label == target_label:
+                target_idx = i
+                target_indent = len(m.group(1))
+
+    if target_idx is None:
+        print(f"Warning: nav_insert target '{target_label}' not found in nav "
+              f"— appending to end", file=sys.stderr)
+        target_idx = len(lines) - 1
+        target_indent = 0
+
+    # When inserting *after*, skip past any children (lines with deeper
+    # indent) so entries land after the entire block.
+    insert_at = target_idx + 1 if where == "after" else target_idx
+    if where == "after":
+        while insert_at < len(lines):
+            stripped = lines[insert_at].strip()
+            if not stripped:
+                insert_at += 1
+                continue
+            child_indent = len(lines[insert_at]) - len(lines[insert_at].lstrip())
+            if child_indent > target_indent:
+                insert_at += 1
+            else:
+                break
+
+    indent_str = " " * target_indent
+    child_indent = " " * (target_indent + 4)
+    insert_lines = []
+
+    if wrapper_label:
+        if entries:
+            first_url = entries[0][1]
+            insert_lines.append(f"{indent_str}- [{wrapper_label}]({first_url})")
+            for title, url in entries[1:]:
+                insert_lines.append(f"{child_indent}- [{title}]({url})")
+        else:
+            insert_lines.append(f"{indent_str}- {wrapper_label}")
+    else:
+        for title, url in entries:
+            insert_lines.append(f"{indent_str}- [{title}]({url})")
+
+    for j, ins in enumerate(insert_lines):
+        lines.insert(insert_at + j, ins)
+
+    return "\n".join(lines)
+
+
+def write_root_nav(docs_dir, sets, cfg):
     """
     Build root SUMMARY_EXT.md from configuration-driven navigation sections
     plus one section per source reference set.
@@ -465,7 +610,9 @@ def write_root_nav(docs_dir, sets, nav_config):
     the output is written directly without ``<!--nav-->`` or
     build_literate_nav formatting.
     """
+    nav_config = cfg.get("navigation", {})
     sections_conf = nav_config.get("sections", [])
+    template_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     # ── GitBook mode: use the old text-transformation approach ───────────
     gitbook_sections = [s for s in sections_conf if s.get("gitbook")]
@@ -491,6 +638,21 @@ def write_root_nav(docs_dir, sets, nav_config):
                     converted.append(line)
 
         content = "".join(converted).rstrip()
+
+        # Process nav_inserts — inject external doc entries at configured positions.
+        for insert in nav_config.get("nav_inserts", []) or []:
+            source = insert.get("source", "")
+            entries = _resolve_external_docs_entries(cfg, template_root, source_label=source)
+            if not entries:
+                print(f"Warning: nav_insert source '{source}' returned no entries",
+                      file=sys.stderr)
+                continue
+            target = insert.get("after") or insert.get("before")
+            where = "after" if insert.get("after") else "before"
+            wrapper = insert.get("label") or None
+            if target:
+                content = _insert_nav_gitbook(content, target, entries,
+                                              where=where, wrapper_label=wrapper)
 
         # Append source reference sections.
         for src_set in sets:
@@ -543,6 +705,46 @@ def write_root_nav(docs_dir, sets, nav_config):
             section_links = _promote_page_roots(section_links)
         for indent, text, url in section_links:
             items.append((indent + 1, text, url))
+
+    # Process nav_inserts — inject external doc entries at configured positions
+    # (standard mode: operate on the item list).
+    for insert in nav_config.get("nav_inserts", []) or []:
+        source = insert.get("source", "")
+        entries = _resolve_external_docs_entries(cfg, template_root, source_label=source)
+        if not entries:
+            print(f"Warning: nav_insert source '{source}' returned no entries",
+                  file=sys.stderr)
+            continue
+        target = insert.get("after") or insert.get("before")
+        where = "after" if insert.get("after") else "before"
+        wrapper = insert.get("label") or None
+
+        # Find the target item's indent and position.
+        target_idx = None
+        target_indent = 0
+        for i, (ind, text, _url) in enumerate(items):
+            if text and text == target:
+                target_idx = i
+                target_indent = ind
+        if target_idx is None:
+            print(f"Warning: nav_insert target '{target}' not found "
+                  f"— appending to end", file=sys.stderr)
+            target_idx = len(items)
+            target_indent = 0
+
+        insert_at = target_idx + 1 if where == "after" else target_idx
+        if wrapper:
+            if entries:
+                items.insert(insert_at, (target_indent, wrapper, entries[0][1]))
+                insert_at += 1
+                child_indent = target_indent + 1
+                for j, (title, uri) in enumerate(entries[1:]):
+                    items.insert(insert_at + j, (child_indent, title, uri))
+            else:
+                items.insert(insert_at, (target_indent, wrapper, None))
+        else:
+            for j, (title, uri) in enumerate(entries):
+                items.insert(insert_at + j, (target_indent, title, uri))
 
     for src_set in sets:
         src_dir = src_set["src_dir"]
@@ -636,7 +838,6 @@ if __name__ == "__main__":
     for src_set in sets:
         generate_category_pages(src_set["src_dir"], force=args.force)
 
-    nav_config = cfg.get("navigation", {})
-    write_root_nav(args.docs_dir, sets, nav_config)
+    write_root_nav(args.docs_dir, sets, cfg)
 
     sys.exit(0)

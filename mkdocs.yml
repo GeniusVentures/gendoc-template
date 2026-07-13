@@ -56,8 +56,8 @@ plugins:
       nav_file: SUMMARY_EXT.md
   - external-docs:
       sources:
-        - "../../SuperGenius/evmrelay/docs/rlpx/**/*.md"
         - "../../SuperGenius/evmrelay/.planning/codebase/ARCHITECTURE.md"
+        - "../../SuperGenius/evmrelay/docs/rlpx/**/*.md"
 
 validation:
   links:
