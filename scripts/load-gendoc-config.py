@@ -131,6 +131,13 @@ def on_config(config):
             features.remove("navigation.indexes")
             logger.info("load_gendoc_config: navigation_indexes = false (feature removed)")
 
+    # ── navigation.sections feature — opt-in via gendoc.yml (default: accordion)
+    if cfg.get("navigation", {}).get("navigation_sections") is True:
+        features = config["theme"]["features"]
+        if "navigation.sections" not in features:
+            features.append("navigation.sections")
+            logger.info("load_gendoc_config: navigation_sections = true (feature added)")
+
     # ── External docs plugin sources ──────────────────────────────────────
     # Inject external_docs.sources from gendoc.yml into the external-docs
     # plugin config so sources are managed in one place (gendoc.yml) rather

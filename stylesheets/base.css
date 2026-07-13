@@ -72,6 +72,13 @@
         height: auto !important;
         max-height: none !important;
     }
+
+    /* Material sets overflow:hidden on the scrollwrap for drill-down nav,
+       but with navigation.sections enabled all sections are expanded.
+       Allow scrolling so items below the viewport aren't clipped. */
+    .md-sidebar--primary .md-sidebar__scrollwrap {
+        overflow-y: auto !important;
+    }
 }
 
 .md-main__inner > .md-content,
