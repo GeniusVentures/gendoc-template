@@ -16,11 +16,12 @@ export const STORAGE_KEY = "gendoc-ask-transcript";
 export const CONFIG_URL = "/ask-config.json";
 
 /**
- * Load /ask-config.json.gz, falling back to /ask-config.json for local dev.
- * Handles the case where the server doesn't set Content-Encoding: gzip
- * (the response body is still compressed — decompress before parsing).
- * Returns null when the file is absent, malformed, or disabled --
- * the caller treats null as "do not install the widget".
+ * Load /ask-config.json and validate the response.
+ * When deploy.cloudflare.gzip_json is true, the fetch-gzip.js
+ * wrapper transparently rewrites this to /ask-config.json.gz
+ * with decompression. Returns null when the file is absent,
+ * malformed, or disabled — the caller treats null as
+ * "do not install the widget".
  */
 export async function loadAskConfig(): Promise<AskConfig | null> {
   try {

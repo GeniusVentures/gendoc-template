@@ -66,8 +66,6 @@ def on_config(config):
         )
         return config
 
-    host_project_root = os.path.dirname(template_root)
-
     # ── Site name ──────────────────────────────────────────────────────────
     project_name = cfg.get("project", {}).get("name")
     if project_name:
@@ -165,6 +163,15 @@ def on_config(config):
         for src in ext_sources:
             if isinstance(src, dict):
                 paths = src.get("paths", [])
+                label = src.get("label", "")
+                if label:
+                    # Labeled sources: include label so consumers can
+                    # resolve per-group nav_inserts (e.g. source: "evmrelay").
+                    resolved.append({
+                        "label": label,
+                        "paths": [os.path.join(host_project_root, p) for p in paths],
+                    })
+                    continue
             else:
                 paths = [src]
             for pattern in paths:

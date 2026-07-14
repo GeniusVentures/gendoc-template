@@ -51,9 +51,10 @@
         if (view.length >= 2 && view[0] === 0x1f && view[1] === 0x8b) {
           var ds = new DecompressionStream("gzip");
           var writer = ds.writable.getWriter();
-          writer.write(body);
-          writer.close();
-          return new Response(ds.readable).arrayBuffer().then(function (decompressed) {
+          return writer.write(body).then(function () {
+            writer.close();
+            return new Response(ds.readable).arrayBuffer();
+          }).then(function (decompressed) {
             return new Response(decompressed, {
               status: 200,
               headers: { "Content-Type": "application/json" },

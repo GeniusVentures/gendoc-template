@@ -118,11 +118,11 @@ llms:
       title: "Architecture & Developer Reference"
       categories: [technical, architecture, api, nodes]
 
- related_catalogs:
-   - url: "https://otherdocs.mysite.com/llms.txt"
-     title: "My Other Docs"
-     description: "My other docs related to base documents"
-     audiences: [llms-technical.txt, llms-sales.txt]
+  related_catalogs:
+    - url: "https://otherdocs.mysite.com/llms.txt"
+      title: "My Other Docs"
+      description: "My other docs related to base documents"
+      audiences: [llms-technical.txt, llms-sales.txt]
 
   # -- Ask AI Widget (optional) -------------------------------------------------
   # Floating "Ask" button + chat drawer that answers questions only from your
