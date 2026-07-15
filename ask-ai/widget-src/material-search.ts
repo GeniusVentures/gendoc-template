@@ -44,12 +44,16 @@ export function installMaterialSearchHook(title: string, target: SearchHookTarge
     btn.style.cssText =
       "margin:0;padding:0 .5rem;cursor:pointer;background:none;border:0;" +
       "font-size:.7rem;font-weight:600;line-height:1;white-space:nowrap;" +
-      "color:var(--md-accent-fg-color,#2f6fed)";
+      "color:var(--md-accent-fg-color,#2f6fed);position:relative;z-index:9999;pointer-events:auto";
 
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
       const query = input.value.trim();
       closeMaterialSearch(input);
-      target.askFromSearch(query);
+      // Defer so Material's focus-restore handlers don't steal focus
+      // back from the drawer input.
+      setTimeout(() => target.askFromSearch(query), 0);
     });
 
     options.appendChild(btn);

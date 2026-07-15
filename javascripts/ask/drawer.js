@@ -79,6 +79,11 @@ export class DrawerUI {
     open() {
         this.drawer.classList.add("open");
         this.inputEl.focus();
+        // Scroll to bottom after the CSS transition starts so dimensions are settled.
+        requestAnimationFrame(() => {
+            this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+            this.syncScrollButton();
+        });
     }
     close() {
         this.drawer.classList.remove("open");
