@@ -9,5 +9,6 @@
     "moduleResolution": "Bundler",
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "worker-globals.d.ts", "search-normalizer.d.ts"]
+  "include": ["src/**/*.ts", "worker-globals.d.ts", "search-normalizer.d.ts"],
+  "exclude": ["src/__tests__"]
 }

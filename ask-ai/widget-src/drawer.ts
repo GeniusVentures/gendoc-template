@@ -19,6 +19,7 @@ export class DrawerUI
   private readonly messagesEl: HTMLElement;
   private readonly inputEl: HTMLInputElement;
   private readonly submitEl: HTMLButtonElement;
+  private readonly scrollBottomEl: HTMLButtonElement;
   private readonly messageEls: HTMLElement[] = [];
   private activeTranscript: Transcript | null = null;
 
@@ -42,6 +43,7 @@ export class DrawerUI
     this.messagesEl = this.query(".messages");
     this.inputEl = this.query<HTMLInputElement>("input");
     this.submitEl = this.query<HTMLButtonElement>("button[type=submit]");
+    this.scrollBottomEl = this.query<HTMLButtonElement>(".scroll-bottom");
 
     // Restore saved drawer width
     const savedWidth = localStorage.getItem('ask-drawer-width');
@@ -193,7 +195,7 @@ export class DrawerUI
     const fragment = template.content;
 
     const title = this.config.title;
-    fragment.querySelector(".fab")!.textContent = `✦ ${title}`;
+    fragment.querySelector(".fab")!.textContent = `💬 ${title}`;
     fragment.querySelector(".drawer")!.setAttribute("aria-label", title);
     fragment.querySelector(".head b")!.textContent = title;
     const input = fragment.querySelector("input")!;
@@ -227,6 +229,14 @@ export class DrawerUI
       {
         this.onAsk(question);
       }
+    });
+
+    // Scroll-to-bottom
+    this.messagesEl.addEventListener("scroll", () => this.syncScrollButton());
+    this.scrollBottomEl.addEventListener("click", () =>
+    {
+      this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+      this.scrollBottomEl.style.display = "none";
     });
   }
 
@@ -448,6 +458,23 @@ export class DrawerUI
     {
       element.appendChild(buildSourceList(message.sources));
     }
+
+    // Auto-scroll: if user is near the bottom, follow new content down
+    const scrollBottom = this.messagesEl.scrollHeight - this.messagesEl.scrollTop - this.messagesEl.clientHeight;
+    if (scrollBottom < 80)
+    {
+      this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+    }
+    else
+    {
+      this.scrollBottomEl.style.display = "";
+    }
+  }
+
+  private syncScrollButton(): void
+  {
+    const dist = this.messagesEl.scrollHeight - this.messagesEl.scrollTop - this.messagesEl.clientHeight;
+    this.scrollBottomEl.style.display = dist > 80 ? "" : "none";
   }
 
   private query<T extends HTMLElement = HTMLElement>(selector: string): T

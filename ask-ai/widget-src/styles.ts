@@ -10,10 +10,11 @@ export const DRAWER_CSS = `
 
   .fab {
     position: fixed; right: 20px; bottom: 20px; z-index: 9998;
-    border: 0; border-radius: 24px; padding: 12px 18px;
+    border: 0; border-radius: 24px; padding: 12px 20px;
     font-size: 14px; font-weight: 600; cursor: pointer; color: #fff;
     background: var(--ask-accent, #2f6fed);
     box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+    white-space: nowrap;
   }
 
   .drawer {
@@ -72,6 +73,13 @@ export const DRAWER_CSS = `
   .messages {
     flex: 1; overflow-y: auto; padding: 14px;
     display: flex; flex-direction: column; gap: 10px;
+  }
+  .scroll-bottom {
+    position: absolute; bottom: 60px; right: 20px; z-index: 10;
+    width: 36px; height: 36px; border: 1px solid var(--ask-drawer-border, #d6dde3);
+    border-radius: 50%; background: var(--ask-drawer-bg, #fff);
+    color: var(--ask-accent, #2f6fed); font-size: 16px; cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
   }
   .message {
     max-width: 88%; padding: 9px 12px; border-radius: 10px;

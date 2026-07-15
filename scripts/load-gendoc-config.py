@@ -104,7 +104,7 @@ def on_config(config):
     # here with the raw relative value from gendoc.yml, or on_post_build's
     # logo-path fix resolves against CWD instead of the real output directory.
 
-    # Stash logo basename for post-build path fix
+    # Stash logo basename for post-build hook
     config["_logo_basename"] = config["theme"].get("logo", "")
 
     # ── GitBook mode flag — enables rewrite_gitbook_paths.py hook ──────────
@@ -137,18 +137,18 @@ def on_config(config):
             logger.info("load_gendoc_config: navigation_sections = true (feature added)")
 
     # ── fetch-gzip.js injection (deploy.cloudflare.gzip_json toggle) ──────
-    # When gzip_json is true (the default), inject fetch-gzip.js at the front
-    # of extra_javascript so it loads before any other script that calls
-    # fetch().  The wrapper intercepts ALL .json fetches on the main thread,
-    # rewriting them to .json.gz with transparent gzip decompression.
-    # When gzip_json is false the wrapper is never loaded — zero overhead,
+    # When gzip_json is true (the default), overrides/main.html renders a
+    # <script> for fetch-gzip.js in the head libs block — BEFORE Material's
+    # bundle.  That ordering is required: the bundle creates the search
+    # Web Worker during init, and the wrapper's Worker override must already
+    # be installed.  The wrapper intercepts fetch/XHR/Worker, rewriting .json
+    # requests to .json.gz with transparent gzip decompression.
+    # When gzip_json is false the template renders nothing — zero overhead,
     # no interception.
     gzip_json = cfg.get("deploy", {}).get("cloudflare", {}).get("gzip_json", True)
-    if gzip_json:
-        config["extra_javascript"].insert(0, "/javascripts/fetch-gzip.js")
-        logger.info("load_gendoc_config: fetch-gzip.js injected (gzip_json=true)")
-    else:
-        logger.info("load_gendoc_config: gzip_json=false — fetch-gzip.js not injected")
+    config["extra"]["gzip_json"] = bool(gzip_json)
+    logger.info("load_gendoc_config: gzip_json=%s", bool(gzip_json))
+
 
     # ── External docs plugin sources ──────────────────────────────────────
     # Inject external_docs.sources from gendoc.yml into the external-docs
@@ -194,19 +194,20 @@ def on_config(config):
 
 
 def on_post_build(config):
-    """Replace absolute logo paths in built HTML with relative basename."""
-    logo = config.get("_logo_basename", "")
-    if not logo:
-        return
+    """Post-build: fix logo paths in built HTML."""
     site_dir = config["site_dir"]
-    count = 0
-    for html_file in Path(site_dir).rglob("*.html"):
-        content = html_file.read_text()
-        updated = re.sub(r'src="[^"]*' + re.escape(logo) + r'"',
-                         f'src="/{logo}"', content)
-        if updated != content:
-            html_file.write_text(updated)
-            count += 1
-    if count:
-        logger.info("load_gendoc_config: fixed logo src in %d files", count)
+
+    # ── Logo path fix ────────────────────────────────────────────────────
+    logo = config.get("_logo_basename", "")
+    if logo:
+        count = 0
+        for html_file in Path(site_dir).rglob("*.html"):
+            content = html_file.read_text()
+            updated = re.sub(r'src="[^"]*' + re.escape(logo) + r'"',
+                             f'src="/{logo}"', content)
+            if updated != content:
+                html_file.write_text(updated)
+                count += 1
+        if count:
+            logger.info("load_gendoc_config: fixed logo src in %d files", count)
 

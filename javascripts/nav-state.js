@@ -10,8 +10,10 @@
 
   const STORAGE_KEY = "nav-state";
   const SIDEBAR_WIDTH_KEY = "gnus-sidebar-width";
+  const TOC_WIDTH_KEY = "gnus-toc-width";
   const TOGGLE_SEL  = "input.md-nav__toggle";
   const PRIMARY_SIDEBAR_SEL = ".md-sidebar--primary";
+  const SECONDARY_SIDEBAR_SEL = ".md-sidebar--secondary";
   const DESKTOP_MEDIA_QUERY = "(min-width: 76.25em)";
   const SCROLL_CONTAINER_SELS = [".md-sidebar__scrollwrap", ".md-sidebar__inner"];
   const DEFAULT_SIDEBAR_WIDTH_REM = 16;
@@ -43,6 +45,19 @@
     const clampedWidth = clamp(widthRem, MIN_SIDEBAR_WIDTH_REM, MAX_SIDEBAR_WIDTH_REM);
     document.documentElement.style.setProperty("--gnus-sidebar-width", `${clampedWidth}rem`);
     localStorage.setItem(SIDEBAR_WIDTH_KEY, String(clampedWidth));
+  }
+
+  function loadTocWidthRem() {
+    const saved = parseFloat(localStorage.getItem(TOC_WIDTH_KEY) || "");
+    return Number.isFinite(saved)
+      ? clamp(saved, MIN_SIDEBAR_WIDTH_REM, MAX_SIDEBAR_WIDTH_REM)
+      : DEFAULT_SIDEBAR_WIDTH_REM;
+  }
+
+  function applyTocWidthRem(widthRem) {
+    const clampedWidth = clamp(widthRem, MIN_SIDEBAR_WIDTH_REM, MAX_SIDEBAR_WIDTH_REM);
+    document.documentElement.style.setProperty("--gnus-toc-width", `${clampedWidth}rem`);
+    localStorage.setItem(TOC_WIDTH_KEY, String(clampedWidth));
   }
 
   function getScrollWrap(sidebar) {
@@ -173,6 +188,44 @@
       };
 
       document.body.classList.add("gnus-sidebar-resizing");
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+      event.preventDefault();
+    });
+  }
+
+  function bindTocResizer() {
+    const toc = document.querySelector(SECONDARY_SIDEBAR_SEL);
+    if (!toc || toc.querySelector(".gnus-toc-resizer")) {
+      return;
+    }
+
+    const handle = document.createElement("div");
+    handle.className = "gnus-toc-resizer";
+    handle.setAttribute("aria-hidden", "true");
+    toc.appendChild(handle);
+
+    handle.addEventListener("mousedown", (event) => {
+      const currentToc = document.querySelector(SECONDARY_SIDEBAR_SEL);
+      if (!currentToc) {
+        return;
+      }
+
+      const rootFontSize = getRootFontSize();
+      const tocRight = currentToc.getBoundingClientRect().right;
+
+      const onMouseMove = (moveEvent) => {
+        const widthRem = (tocRight - moveEvent.clientX) / rootFontSize;
+        applyTocWidthRem(widthRem);
+      };
+
+      const onMouseUp = () => {
+        document.body.classList.remove("gnus-toc-resizing");
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+      };
+
+      document.body.classList.add("gnus-toc-resizing");
       document.addEventListener("mousemove", onMouseMove);
       document.addEventListener("mouseup", onMouseUp);
       event.preventDefault();
@@ -330,9 +383,11 @@
 
     // Re-bind toggle listeners to any new DOM nodes from the SPA swap.
     applySidebarWidthRem(loadSidebarWidthRem());
+    applyTocWidthRem(loadTocWidthRem());
     bindToggleListeners();
     bindIndexLinkExpanders();
     bindSidebarResizer();
+    bindTocResizer();
     bindSidebarWheelIsolation();
     bindScrollPersist();
 

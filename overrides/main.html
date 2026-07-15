@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{#
+  fetch-gzip.js must load BEFORE Material's bundle: the bundle creates the
+  search Web Worker during init, and the wrapper's Worker override has to be
+  installed by then.  extra_javascript renders after the bundle, so it can't
+  be used.  The libs block renders in <head>, ahead of everything.
+
+  config.extra.gzip_json is set by scripts/load-gendoc-config.py from the
+  host project's gendoc.yml (deploy.cloudflare.gzip_json).
+#}
+{% block libs %}
+  {% if config.extra.gzip_json %}
+    <script src="{{ '/javascripts/fetch-gzip.js' | url }}"></script>
+  {% endif %}
+  {{ super() }}
+{% endblock %}

@@ -89,6 +89,33 @@ def _remove_orphaned_links(item):
                              and getattr(c, "title", None) is None)]
 
 
+def _lift_index_children(item):
+    """
+    When a Section has an index child that itself has children, lift those
+    grandchildren to be direct children of this section.
+
+    Material's navigation.indexes rendering hides the index child from the
+    sidebar — and with it, all of that child's descendants.  Lifting the
+    grandchildren up before render keeps them visible while the index child
+    still provides the clickable section link.
+    """
+    children = getattr(item, "children", None)
+    if not children:
+        return
+
+    # Recurse first so deeper sections are handled before their parent.
+    for child in children:
+        _lift_index_children(child)
+
+    # Find the index child — if it has its own children, lift them.
+    for i, child in enumerate(children):
+        if getattr(child, "is_index", False):
+            grandkids = getattr(child, "children", None)
+            if grandkids:
+                children[i:i + 1] = grandkids
+            break
+
+
 def _promote_section_indexes(item):
     """
     Recursively turn each Section's orphaned titleless child into its index.
@@ -96,7 +123,7 @@ def _promote_section_indexes(item):
     A titleless Link child (the leftover parent link) is promoted by setting
     `is_index = True`, which is the flag Material's nav template checks to
     decide whether to render the section title as a link.
-    Requires navigation.sections to be enabled.
+    Requires navigation.sections or navigation.indexes to be enabled.
     """
     children = getattr(item, "children", None)
     if not children:
@@ -133,18 +160,22 @@ def _promote_section_indexes(item):
 def on_nav(nav, config, files):
     """MkDocs hook entry point — rewrite Link urls then clean up orphans.
 
-    When navigation.sections is enabled, promote titleless children to
-    section indexes so Material renders clickable section titles.  When
-    disabled (accordion mode), remove the orphans entirely — they would
-    render as "None" entries.
+    When navigation.sections or navigation.indexes is enabled, promote
+    titleless children to section indexes so Material renders clickable
+    section titles, and lift grandchildren of any index child so they
+    aren't hidden by Material's index rendering.  When neither is enabled
+    (accordion mode), remove the orphans entirely — they would render as
+    "None" entries.
     """
     features = config["theme"].get("features", [])
     has_sections = "navigation.sections" in features
+    has_indexes = "navigation.indexes" in features
 
     for item in nav.items:
         _rewrite_link_urls(item)
-        if has_sections:
+        if has_sections or has_indexes:
             _promote_section_indexes(item)
+            _lift_index_children(item)
         else:
             _remove_orphaned_links(item)
 

@@ -106,10 +106,17 @@ else
     echo "  index.md regenerated from $HANDWRITTEN_DOCS/index.md.template"
 fi
 
-# ── Step 3: Build MkDocs site ─────────────────────────────────────────────────
+# ── Step 3: Compile widget TypeScript (before mkdocs copies JS) ────────────
 echo ""
 echo "=============================================="
-echo "  Step 3: Building MkDocs site"
+echo "  Step 3:  Compiling ask widget TypeScript"
+echo "=============================================="
+"$SCRIPT_DIR/build-widget.sh" --compile-only
+
+# ── Step 4: Build MkDocs site ─────────────────────────────────────────────────
+echo ""
+echo "=============================================="
+echo "  Step 4: Building MkDocs site"
 echo "=============================================="
 
 SITE_DIR_ABS="$TEMPLATE_ROOT/$SITE_DIR"
@@ -123,10 +130,10 @@ else
     exit $exit_code
 fi
 
-# ── Step 4: Build search vocabulary for the typo-tolerant ask worker ──────────
+# ── Step 5: Build search vocabulary for the typo-tolerant ask worker ──────────
 echo ""
 echo "=============================================="
-echo "  Step 4:  Building search vocabulary"
+echo "  Step 5:  Building search vocabulary"
 echo "=============================================="
 VOCAB_BUILDER="$SCRIPT_DIR/build-vocab.py"
 SEARCH_INDEX="$SITE_DIR_ABS/search/search_index.json"
@@ -143,18 +150,41 @@ else
     echo "  Skipped — search_index.json or build-vocab.py not found"
 fi
 
-# ── Step 5: Build ask widget (must run AFTER mkdocs — writes to site dir) ──────
+# ── Step 6: Generate ask-config.json (after mkdocs, before gzip) ───────────
 echo ""
 echo "=============================================="
-echo "  Step 5:  Building ask widget"
+echo "  Step 6:  Generating ask-config.json"
 echo "=============================================="
-"$SCRIPT_DIR/build-widget.sh"
+"$SCRIPT_DIR/build-widget.sh" --config-only
 
 echo ""
 echo "=============================================="
-echo "  Step 6: Generating llms.txt agent catalogs"
+echo "  Step 7: Generating llms.txt agent catalogs"
 echo "=============================================="
 python3 "$SCRIPT_DIR/build-llms.py" "$@"
+
+# ── Step 8: Gzip JSON files for local dev (fetch-gzip.js wrapper) ──────────
+echo ""
+echo "=============================================="
+echo "  Step 8:  Gzipping JSON files for dev server"
+echo "=============================================="
+
+GZIP_JSON=$(read_yaml "deploy.cloudflare.gzip_json")
+GZIP_JSON="${GZIP_JSON:-True}"  # default to True (matches load-gendoc-config.py)
+if [ "$GZIP_JSON" = "True" ]; then
+    count=0
+    while IFS= read -r -d '' f; do
+        if gzip -fk "$f" 2>/dev/null; then
+            rm "$f"
+            count=$((count + 1))
+        else
+            echo "  Warning: gzip failed for ${f#$SITE_DIR_ABS/}" >&2
+        fi
+    done < <(find "$SITE_DIR_ABS" -name "*.json" -type f ! -name "*.json.gz" -print0)
+    echo "  Gzipped $count .json files (raw .json deleted, fetch-gzip.js + search-gzip.js serve .gz)"
+else
+    echo "  Skipped — deploy.cloudflare.gzip_json is not True"
+fi
 
 # ── Success ───────────────────────────────────────────────────────────────────
 echo ""

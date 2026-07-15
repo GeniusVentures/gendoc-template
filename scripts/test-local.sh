@@ -8,7 +8,8 @@
 #   EOF
 #
 # Then just run this script from the project root.  Press Ctrl-C to stop
-# everything and the site's ask-config.json will be restored automatically.
+# everything.  The widget auto-detects localhost and uses the local worker —
+# no file patching needed.
 #
 #   gendoc-template/scripts/test-local.sh
 set -euo pipefail
@@ -28,10 +29,12 @@ HOST_SITE="$HOST_ROOT/site"
 if [ -f "$HOST_SITE/index.html" ] && [ ! -f "$SITE_DIR/index.html" ]; then
     SITE_DIR="$HOST_SITE"
 fi
-CONFIG_FILE="$SITE_DIR/ask-config.json"
 WORKER_DIR="$TEMPLATE_ROOT/ask-ai"
 WRANGLER_CONFIG="$TEMPLATE_ROOT/../wrangler-ask.toml"
 DEV_VARS="$HOST_ROOT/.dev.vars"
+
+LOCAL_CONFIG="$SITE_DIR/ask-config.local.json"
+LOCAL_CONFIG_GZ="$SITE_DIR/ask-config.local.json.gz"
 
 WORKER_PORT="${ASK_LOCAL_PORT:-8787}"
 SITE_PORT="${ASK_SITE_PORT:-8000}"
@@ -66,10 +69,8 @@ cleanup() {
     lsof -ti ":$WORKER_PORT" 2>/dev/null | xargs kill -9 2>/dev/null || true
     wait 2>/dev/null || true
 
-    if [ -f "$CONFIG_FILE.bak" ]; then
-        mv "$CONFIG_FILE.bak" "$CONFIG_FILE"
-        echo "Restored $CONFIG_FILE"
-    fi
+    # Remove local config files created by this script.
+    rm -f "${LOCAL_CONFIG:-}" "${LOCAL_CONFIG_GZ:-}"
     echo "Done."
 }
 trap cleanup EXIT INT TERM
@@ -98,16 +99,6 @@ if [ ! -d "$WORKER_DIR/worker/node_modules" ]; then
     echo "Installing worker npm dependencies..."
     (cd "$WORKER_DIR/worker" && npm install)
 fi
-# ask-config.json may be in the other site dir if the build split.
-if [ ! -f "$CONFIG_FILE" ]; then
-    if [ -f "$TEMPLATE_ROOT/site/ask-config.json" ]; then
-        cp "$TEMPLATE_ROOT/site/ask-config.json" "$CONFIG_FILE"
-        echo "Copied ask-config.json from template site dir."
-    else
-        echo "ERROR: $CONFIG_FILE not found -- run build.sh first" >&2
-        exit 1
-    fi
-fi
 if [ ! -f "$DEV_VARS" ]; then
     echo "WARNING: $DEV_VARS not found — worker won't have API keys."
     echo "         Create it with your GEMINI_API_KEY and OPENROUTER_API_KEY"
@@ -115,18 +106,29 @@ if [ ! -f "$DEV_VARS" ]; then
     echo ""
 fi
 
-# ── patch ask-config.json → local worker ─────────────────────────────────────
-cp "$CONFIG_FILE" "$CONFIG_FILE.bak"
-python3 -c "
-import json, sys
-with open(sys.argv[1], 'r') as f:
-    cfg = json.load(f)
-cfg['endpoint'] = sys.argv[2]
-with open(sys.argv[1], 'w') as f:
-    json.dump(cfg, f, indent=2)
-    f.write('\n')
-" "$CONFIG_FILE" "$WORKER_URL"
-echo "Patched ask-config.json endpoint → $WORKER_URL"
+# ── generate ask-config.local.json → local worker ─────────────────────────────
+# The widget looks for this file first on localhost; falls back to
+# ask-config.json when absent (e.g. testing against remote worker).
+read_yaml() {
+    python3 "$SCRIPT_DIR/read-yaml.py" "$HOST_ROOT/gendoc.yml" "$1"
+}
+ASK_TITLE=$(read_yaml "llms.ask.title")
+ASK_TITLE="${ASK_TITLE:-Ask}"
+ASK_PLACEHOLDER=$(read_yaml "llms.ask.placeholder")
+ASK_PLACEHOLDER="${ASK_PLACEHOLDER:-Ask a question...}"
+
+cat > "$LOCAL_CONFIG" <<EOF
+{
+  "enabled": true,
+  "endpoint": "$WORKER_URL",
+  "title": "$ASK_TITLE",
+  "placeholder": "$ASK_PLACEHOLDER",
+  "llms_full_url": "$SITE_URL/llms-full.txt"
+}
+EOF
+gzip -fk "$LOCAL_CONFIG"  # for fetch-gzip.js wrapper
+rm "$LOCAL_CONFIG"        # widget loads .json.gz via fetch-gzip.js
+echo "Generated $LOCAL_CONFIG_GZ (widget → $WORKER_URL)"
 
 # ── start wrangler dev (background) ───────────────────────────────────────────
 echo ""
@@ -159,7 +161,7 @@ done
 # ── start static server (foreground) ─────────────────────────────────────────
 echo ""
 echo "Serving site at $SITE_URL"
-echo "Press Ctrl-C to stop everything and restore ask-config.json."
+echo "Press Ctrl-C to stop."
 echo "------------------------------------------------------------"
 free_port "$SITE_PORT"
 cd "$SITE_DIR" && python3 -m http.server "$SITE_PORT" --protocol HTTP/1.1 &

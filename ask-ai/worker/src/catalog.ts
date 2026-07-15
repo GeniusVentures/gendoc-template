@@ -63,13 +63,15 @@ export function scoreEntries(entries: CatalogEntry[], terms: string[]): CatalogE
         if (url.includes(t)) score += 1;
       }
 
-      const isSourceRef = /\/source-reference\/|\/python-reference\//.test(e.url);
-      if (!isSourceRef) {
-        const entityName = e.title.replace(/\s*\((?:class|struct|protocol|file|namespace|dir|enum)\)\s*$/i, '').trim();
-        const isFallback = !e.desc || e.desc === '(no description yet)' ||
-          e.desc.toLowerCase() === entityName.toLowerCase() ||
-          e.desc.split(/\s+/).length < 3;
-        if (!isFallback) score += 2;
+      if (score > 0) {
+        const isSourceRef = /\/source-reference\/|\/python-reference\//.test(e.url);
+        if (!isSourceRef) {
+          const entityName = e.title.replace(/\s*\((?:class|struct|protocol|file|namespace|dir|enum)\)\s*$/i, '').trim();
+          const isFallback = !e.desc || e.desc === '(no description yet)' ||
+            e.desc.toLowerCase() === entityName.toLowerCase() ||
+            e.desc.split(/\s+/).length < 3;
+          if (!isFallback) score += 2;
+        }
       }
 
       const hasBrief = e.desc && e.desc.length > 0 &&

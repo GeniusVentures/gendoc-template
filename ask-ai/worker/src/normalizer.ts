@@ -38,7 +38,7 @@ function tokenize(text: string): string[] {
  *   - one character inserted at each position (alphabet)
  *   - adjacent character transpositions
  */
-function ed1Variants(word: string): Set<string> {
+export function ed1Variants(word: string): Set<string> {
   const variants = new Set<string>();
   const alpha = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -65,19 +65,64 @@ function ed1Variants(word: string): Set<string> {
   return variants;
 }
 
+/**
+ * Decompress gzip bytes — exact same concurrent reader/writer pattern as
+ * fetch-gzip.js to avoid backpressure deadlock in workerd / Cloudflare Workers.
+ */
+async function decompressGzip(buf: ArrayBuffer): Promise<ArrayBuffer> {
+  const ds = new DecompressionStream('gzip');
+  const reader = ds.readable.getReader();
+  const writer = ds.writable.getWriter();
+  const chunks: Uint8Array[] = [];
+
+  // Start the reader FIRST so it's ready before the writer pushes data.
+  // If the writer writes before the reader calls read(), the stream's
+  // internal buffer fills and writer.write() hangs (backpressure deadlock).
+  const readDone = reader.read().then(function pump(result: any): any {
+    if (result.done) {
+      let total = 0;
+      for (let i = 0; i < chunks.length; i++) total += chunks[i].byteLength;
+      const merged = new Uint8Array(total);
+      let off = 0;
+      for (let j = 0; j < chunks.length; j++) {
+        merged.set(chunks[j], off);
+        off += chunks[j].byteLength;
+      }
+      return merged.buffer as ArrayBuffer;
+    }
+    chunks.push(result.value);
+    return reader.read().then(pump);
+  }) as Promise<ArrayBuffer>;
+
+  await writer.write(new Uint8Array(buf));
+  await writer.close();
+  return readDone;
+}
+
 async function loadVocab(env: Env, origin: string) {
   const cached = cache.get(origin);
   if (cached) return cached;
 
-  // Try gzipped first (Cloudflare Pages), fall back to plain (local dev)
+  // Python http.server sends raw gzip bytes without Content-Encoding.
+  // Read the body once, then detect format.  (res.json() would consume
+  // the body, making res.arrayBuffer() in the catch unusable.)
   let res = await fetch(new URL('/data/search-vocab.json.gz', origin).href,
     { cf: { cacheTtl: 86400, cacheEverything: true } });
-  if (!res.ok) {
-    res = await fetch(new URL('/data/search-vocab.json', origin).href,
-      { cf: { cacheTtl: 86400, cacheEverything: true } });
-  }
   if (!res.ok) throw new Error(`Failed to load vocab: ${res.status}`);
-  const data: SearchVocab = await res.json();
+
+  const raw = await res.arrayBuffer();
+  let data: SearchVocab;
+  try {
+    data = JSON.parse(new TextDecoder().decode(raw));
+  } catch {
+    const view = new Uint8Array(raw);
+    if (view.length >= 2 && view[0] === 0x1f && view[1] === 0x8b) {
+      const decoded = await decompressGzip(raw);
+      data = JSON.parse(new TextDecoder().decode(decoded));
+    } else {
+      throw new Error('Vocab response is neither JSON nor gzip');
+    }
+  }
 
   const vocabSet = new Set(data.vocab);
   const additionalStopwords = new Set(data.stopwords);
@@ -87,14 +132,22 @@ async function loadVocab(env: Env, origin: string) {
   return result;
 }
 
+export interface ExtractTermsResult {
+  terms: string[];
+  /** original → corrected word (ED1 or alias match) */
+  corrections: Record<string, string>;
+  /** words not found in vocab at all, no ED1 match */
+  unmatched: string[];
+}
+
 /**
  * Extract and normalize search terms from a user question.
  * Uses the precomputed vocabulary for typo correction via on-demand
  * edit-distance-1 variant lookup (no precomputed delete index).
  */
-export async function extractTerms(env: Env, question: string, origin: string): Promise<string[]> {
+export async function extractTerms(env: Env, question: string, origin: string): Promise<ExtractTermsResult> {
   const rawTokens = tokenize(question);
-  if (rawTokens.length === 0) return [];
+  if (rawTokens.length === 0) return { terms: [], corrections: {}, unmatched: [] };
 
   let vocabSet: Set<string>;
   let aliases: Record<string, string>;
@@ -107,10 +160,13 @@ export async function extractTerms(env: Env, question: string, origin: string): 
     additionalStopwords = v.additionalStopwords;
   } catch (e: any) {
     console.log(`[ask] vocab load failed, using raw terms: ${e.message}`);
-    return rawTokens.filter(t => !STOPWORDS.has(t) && t.length >= 2);
+    const terms = rawTokens.filter(t => !STOPWORDS.has(t) && t.length >= 2);
+    return { terms, corrections: {}, unmatched: [] };
   }
 
   const corrected: string[] = [];
+  const corrections: Record<string, string> = {};
+  const unmatched: string[] = [];
 
   for (const token of rawTokens) {
     const lower = token.toLowerCase();
@@ -122,6 +178,7 @@ export async function extractTerms(env: Env, question: string, origin: string): 
 
     // Check single-word alias
     if (aliases[lower] && !aliases[lower].includes(' ')) {
+      corrections[lower] = aliases[lower];
       corrected.push(aliases[lower]);
       continue;
     }
@@ -139,14 +196,17 @@ export async function extractTerms(env: Env, question: string, origin: string): 
     if (hits.length === 1) {
       // Single unambiguous correction
       console.log(`[ask] spell correct: "${lower}" → "${hits[0]}"`);
+      corrections[lower] = hits[0];
       corrected.push(hits[0]);
     } else {
-      // Ambiguous or no correction — keep original
+      // Ambiguous or no correction — keep original, mark unmatched
       corrected.push(lower);
+      unmatched.push(lower);
     }
   }
 
   // Union: original + corrected (so misspellings still match raw content)
   const expanded = [...new Set([...rawTokens.map(t => t.toLowerCase()), ...corrected])];
-  return expanded.filter(t => t.length >= 2 && !STOPWORDS.has(t) && !additionalStopwords.has(t));
+  const terms = expanded.filter(t => t.length >= 2 && !STOPWORDS.has(t) && !additionalStopwords.has(t));
+  return { terms, corrections, unmatched };
 }

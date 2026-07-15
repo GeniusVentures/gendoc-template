@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 # build-widget.sh -- compile the ask widget (ask-ai/widget-src) to ES modules
 # at javascripts/ask/, and generate ask-config.json for the deployed site.
-# Must run BEFORE the mkdocs build step.
+# Pass --compile-only to skip config generation (compile before mkdocs).
+# Pass --config-only to skip compilation (config after mkdocs).
 set -euo pipefail
+
+MODE="all"
+for arg in "$@"; do
+    case "$arg" in
+        --compile-only) MODE="compile" ;;
+        --config-only)  MODE="config" ;;
+    esac
+done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -30,10 +39,16 @@ fi
 # ── Step 1: Compile TypeScript widget source ────────────────────────────────
 command -v npx >/dev/null 2>&1 || { echo "ERROR: npx not found -- Node.js is a prerequisite" >&2; exit 1; }
 
-echo "  Compiling ask-ai TypeScript..."
-npx -y -p typescript@5 tsc -p "$TEMPLATE_ROOT/ask-ai/widget-src"
+if [ "$MODE" != "config" ]; then
+    echo "  Compiling ask-ai TypeScript..."
+    npx -y -p typescript@5 tsc -p "$TEMPLATE_ROOT/ask-ai/widget-src"
+fi
 
 # ── Step 2: Generate ask-config.json ────────────────────────────────────────
+if [ "$MODE" = "compile" ]; then
+    echo "  Skipping ask-config.json (--compile-only)"
+    exit 0
+fi
 SITE_DIR=$(read_yaml "mkdocs.site_dir")
 SITE_DIR="${SITE_DIR:-site}"
 SITE_DIR_ABS="$TEMPLATE_ROOT/$SITE_DIR"

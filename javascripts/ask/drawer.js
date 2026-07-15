@@ -25,6 +25,7 @@ export class DrawerUI {
         this.messagesEl = this.query(".messages");
         this.inputEl = this.query("input");
         this.submitEl = this.query("button[type=submit]");
+        this.scrollBottomEl = this.query(".scroll-bottom");
         // Restore saved drawer width
         const savedWidth = localStorage.getItem('ask-drawer-width');
         if (savedWidth) {
@@ -138,7 +139,7 @@ export class DrawerUI {
       </section>`;
         const fragment = template.content;
         const title = this.config.title;
-        fragment.querySelector(".fab").textContent = `✦ ${title}`;
+        fragment.querySelector(".fab").textContent = `💬 ${title}`;
         fragment.querySelector(".drawer").setAttribute("aria-label", title);
         fragment.querySelector(".head b").textContent = title;
         const input = fragment.querySelector("input");
@@ -165,6 +166,12 @@ export class DrawerUI {
             if (question) {
                 this.onAsk(question);
             }
+        });
+        // Scroll-to-bottom
+        this.messagesEl.addEventListener("scroll", () => this.syncScrollButton());
+        this.scrollBottomEl.addEventListener("click", () => {
+            this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+            this.scrollBottomEl.style.display = "none";
         });
     }
     /* ----------------------------- session list UI ----------------------------- */
@@ -330,6 +337,18 @@ export class DrawerUI {
         if (message.sources.length > 0) {
             element.appendChild(buildSourceList(message.sources));
         }
+        // Auto-scroll: if user is near the bottom, follow new content down
+        const scrollBottom = this.messagesEl.scrollHeight - this.messagesEl.scrollTop - this.messagesEl.clientHeight;
+        if (scrollBottom < 80) {
+            this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+        }
+        else {
+            this.scrollBottomEl.style.display = "";
+        }
+    }
+    syncScrollButton() {
+        const dist = this.messagesEl.scrollHeight - this.messagesEl.scrollTop - this.messagesEl.clientHeight;
+        this.scrollBottomEl.style.display = dist > 80 ? "" : "none";
     }
     query(selector) {
         const element = this.root.querySelector(selector);
