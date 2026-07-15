@@ -40,8 +40,9 @@ wrangler.toml
 ask-ai/.endpoint
 ask-ai/.dev.vars
 ask-ai/wrangler-ask.toml
-# Generated custom theme (produced by load-theme.py from gendoc.yml custom_css)
-themes/custom.css
 plugins/*.egg-info/
 # Generated custom theme (produced by load-theme.py from gendoc.yml custom_css)
 themes/custom.css
+# generator vocabulary for documentation
+ask-ai/worker/src/data/
+.idea
