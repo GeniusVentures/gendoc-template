@@ -1,8 +1,8 @@
 /*
- * themes/indigo.css
+ * themes/protocol.css
  *
- * The original indigo professional docs theme (clean whitespace, sticky right
- * TOC, indigo accent, Inter type). Select with `theme.name: "indigo"` in
+ * "Protocol"-style professional docs theme (clean whitespace, sticky right
+ * TOC, indigo accent, Inter type). Select with `theme.name: "protocol"` in
  * gendoc.yml. See GCS Docs Theme.dc.html in the design project for the
  * source mockup this preset implements.
  *
@@ -151,9 +151,22 @@ body, .md-typeset, .md-header, .md-nav, .md-search__input, .md-tabs {
 .md-typeset .md-content__button,
 .md-typeset small { font-size: 13px !important; }
 
-/* ── Page gutters (sidebars only) ──────────────────────────────────────────── */
+/* ── Content column width ─────────────────────────────────────────────────
+   Unlike themes/theme.css (old theme, max-width:860px), protocol.css never
+   capped the reading column — body text stretched the full width between
+   the sidebars, producing very long lines that read as oversized. */
+.md-content__inner {
+  max-width: 820px;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  box-sizing: border-box;
+}
+
+/* ── Page gutters (content area only) ─────────────────────────────────────── */
 :root {
   --gnus-page-gutter-min: 2rem;
+  --gnus-toc-width: 16rem;
+  --ask-icon: ✨;
 }
 .md-sidebar--primary {
   padding-left: var(--gnus-page-gutter-min);
@@ -162,10 +175,9 @@ body, .md-typeset, .md-header, .md-nav, .md-search__input, .md-tabs {
   padding-right: var(--gnus-page-gutter-min);
 }
 
-/* ── TOC sidebar width ───────────────────────────────────────────────────── */
-:root {
-  --gnus-toc-width: 16rem;
-}
+/* ── TOC sidebar width ─────────────────────────────────────────────────────
+   Makes the right-hand "On this page" rail wider (matches left sidebar) and
+   adds a drag-resize handle so the user can adjust it. */
 @media screen and (min-width: 76.25em) {
   .md-main__inner > .md-sidebar--secondary {
     flex: 0 0 var(--gnus-toc-width) !important;
@@ -526,70 +538,6 @@ body, .md-typeset, .md-header, .md-nav, .md-search__input, .md-tabs {
   display: none !important;
 }
 
-/* ── Mobile hamburger and drill-down drawer ──────────────────────────────── */
-.md-header__button[for="__drawer"] {
-  width: 34px;
-  height: 34px;
-  margin-right: 8px;
-  padding: 8px;
-  border: 1px solid var(--md-default-fg-color--lightest);
-  border-radius: 8px;
-  color: var(--md-default-fg-color--light) !important;
-  background-color: var(--gnus-search-bg);
-  box-sizing: border-box;
-}
-.md-header__button[for="__drawer"]:hover {
-  color: var(--md-default-fg-color) !important;
-  border-color: var(--md-default-fg-color--lighter);
-}
-.md-header__button[for="__drawer"] svg {
-  width: 18px;
-  height: 18px;
-  fill: currentColor;
-}
-
-@media screen and (max-width: 76.234375em) {
-  .md-sidebar--primary {
-    color: var(--md-default-fg-color);
-    background: var(--md-default-bg-color);
-    border-right: 1px solid var(--md-default-fg-color--lightest);
-  }
-  .md-nav--primary .md-nav__title {
-    height: var(--gnus-header-height);
-    padding: 0 1rem;
-    border-bottom: 1px solid var(--md-default-fg-color--lightest);
-    color: var(--md-default-fg-color) !important;
-    background: var(--md-primary-fg-color);
-    font-size: 14px !important;
-    font-weight: 650 !important;
-    line-height: var(--gnus-header-height);
-    letter-spacing: 0;
-    text-transform: none;
-  }
-  .md-nav--primary .md-nav__title .md-nav__icon {
-    color: var(--md-default-fg-color--light);
-  }
-  .md-nav--primary > .md-nav__list,
-  .md-nav--primary .md-nav > .md-nav__list {
-    padding: .65rem .45rem 1.5rem;
-    background: var(--md-default-bg-color);
-  }
-  .md-nav--primary .md-nav__link {
-    margin: .08rem 0;
-    padding: .45rem .65rem;
-    border-radius: 8px;
-  }
-  .md-nav--primary label.md-nav__link:hover,
-  .md-nav--primary label.md-nav__link:focus {
-    color: var(--md-default-fg-color);
-    background: var(--md-accent-fg-color--transparent);
-  }
-  .md-overlay {
-    background-color: rgba(15, 23, 42, .28);
-    backdrop-filter: blur(2px);
-  }
-}
-
 /* ── Left nav ─────────────────────────────────────────────────────────────── */
 .md-nav__title {
   font-weight: 700 !important;
@@ -719,6 +667,9 @@ body, .md-typeset, .md-header, .md-nav, .md-search__input, .md-tabs {
 /* ── Ask AI Drawer theme variables ────────────────────────────────────────── */
 :root {
   --ask-accent: #4f46e5;
+  --ask-on-accent: #fff;
+  --ask-icon: ✨;
+  --ask-font: 'Inter', system-ui, -apple-system, sans-serif;
   --ask-drawer-bg: #fff;
   --ask-drawer-fg: #0f172a;
   --ask-drawer-border: #e5e7eb;
@@ -743,4 +694,6 @@ body, .md-typeset, .md-header, .md-nav, .md-search__input, .md-tabs {
   --ask-dark-session-bg: #0b0d12;
   --ask-dark-session-item-border: #1e2230;
   --ask-dark-muted-fg: #94a3b8;
+  --ask-dark-thinking-fg: #a0b0c0;
+  --ask-dark-link: #6fa8f0;
 }
