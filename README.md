@@ -3,7 +3,7 @@
 A reusable MkDocs documentation template for GNUS C++ projects.
 
 Add as a git submodule, configure one YAML file, and get a complete documentation site with
-Material theme, mermaid diagrams, mathjax rendering, Doxygen source reference integration,
+selectable Material-based themes, mermaid diagrams, mathjax rendering, Doxygen source reference integration,
 `llms.txt` agent catalogs, and an optional "Ask AI" widget grounded on your own docs --
 deployable to Cloudflare Pages.
 
@@ -82,6 +82,98 @@ submodule), unless the path starts with `/`.
 | `use_directory_urls` | bool | no | Clean URLs without `.html` extension (default: `true`) |
 | `strict` | bool | no | Build with `--strict` -- warnings become errors (default: `false`) |
 
+### `theme` -- Site Theme
+
+The theme is selected in the **parent project's** `gendoc.yml`; do not edit `mkdocs.yml`
+in the submodule. Every build loads `stylesheets/base.css` first and then the selected
+preset from `themes/`.
+
+```yaml
+theme:
+  name: "protocol"
+```
+
+| Name | Description |
+|------|-------------|
+| `default` | Original GNUS cyan theme and the fallback when no valid theme is configured |
+| `indigo` | Spacious indigo theme with a separate right-hand table of contents |
+| `protocol` | Zinc and emerald API-documentation theme inspired by Tailwind Plus Protocol |
+| `custom` | A CSS file owned by the parent project; requires `custom_css` |
+
+To use a parent-project stylesheet:
+
+```yaml
+theme:
+  name: "custom"
+  custom_css: "docs/my-theme.css" # relative to the parent project root
+```
+
+The loader copies that file into the build assets and loads it after `base.css`. A missing
+file or unknown preset produces a warning and falls back to `default`.
+
+#### Creating a Theme
+
+Start with a small custom stylesheet in the parent project. `base.css` already owns the
+shared desktop grid, resizable left sidebar, mobile navigation behavior, figure alignment,
+and content bottom spacing. A theme should concentrate on colors, type, spacing, and
+component appearance unless it deliberately needs a different layout.
+
+At minimum, define both Material color schemes and the Ask AI variables used by the widget:
+
+```css
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #ffffff;
+  --md-primary-bg-color: #18181b;
+  --md-accent-fg-color: #10b981;
+  --md-typeset-a-color: #059669;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #18181b;
+  --md-primary-bg-color: #ffffff;
+  --md-accent-fg-color: #34d399;
+  --md-typeset-a-color: #34d399;
+}
+
+:root {
+  --ask-accent: #10b981;
+  --ask-drawer-bg: #ffffff;
+  --ask-drawer-fg: #18181b;
+  --ask-drawer-border: #e4e4e7;
+  --ask-dark-bg: #18181b;
+  --ask-dark-fg: #f4f4f5;
+  --ask-dark-border: #3f3f46;
+}
+```
+
+Useful MkDocs Material selectors include `.md-header`, `.md-search__form`,
+`.md-header__button[for="__drawer"]`, `.md-sidebar--primary`, `.md-nav__link`,
+`.md-nav--primary .md-nav__title`, `.md-content__inner`, `.md-typeset`,
+`.md-typeset .highlight`, `.md-typeset .admonition`, and `.md-footer`. Scope palette and
+contrast changes under the two color-scheme attributes so the light/dark toggle remains
+correct. Test navigation, search results, inline and fenced code, tables, admonitions,
+mobile navigation, and the Ask AI drawer in both modes.
+
+To contribute a reusable built-in preset:
+
+1. Add `themes/<name>.css`; keep the filename lowercase and use only letters, numbers, and hyphens.
+2. Add `<name>` to `BUILTIN_PRESETS` in `scripts/load-theme.py`.
+3. If the design needs a Material feature such as `toc.integrate`, add that behavior to
+   `_configure_material_features()` instead of asking every parent project to edit `mkdocs.yml`.
+4. Add the preset to the table above and to the comment in `gendoc.yml.example`.
+5. Build a parent project with `theme.name: "<name>"`, then verify the emitted HTML loads
+   `/stylesheets/base.css` before `/themes/<name>.css`.
+
+### `navigation` -- Sidebar Behavior
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `navigation_sections` | bool | `false` | Use the mobile-friendly accordion/drill-down sidebar. Set `true` for always-expanded Material sections. |
+| `navigation_indexes` | bool | `true` | Allow section index pages to act as navigation entries. |
+| `section_index` | bool | `true` | Enable the MkDocs section-index plugin. |
+| `generate_index` | bool | `false` | Regenerate `index.md` from the configured source documents during builds. |
+| `sections` | list | `[]` | Define the hand-written navigation sections merged before generated source references. |
+
 ### `doxygen` -- Doxygen Configuration (shared by all source reference sets)
 
 | Field | Type | Required | Description |
@@ -118,9 +210,9 @@ every set; each set's `exclude_patterns` are appended.
 | `custom_domain` | string | no | Custom domain -- setup.sh prints the dashboard steps |
 | `compatibility_date` | string | **yes** (for deploy) | Cloudflare compatibility date (e.g. `"2024-01-01"`) |
 
-**Credentials:** `setup.sh` uses `wrangler login` (browser OAuth).  For CI/CD, `deploy.sh`
-uses `CF_API_TOKEN` and `CF_ACCOUNT_ID` environment variables -- never put credentials in
-`gendoc.yml`.
+**Credentials:** `setup.sh` uses `wrangler login` (browser OAuth). For CI/CD, Wrangler
+reads `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` from the environment -- never put
+credentials in `gendoc.yml`.
 
 ### `llms` -- llms.txt Agent Catalogs
 
@@ -343,8 +435,8 @@ exists and syncs worker configuration changes.
 
 ```bash
 # For CI/CD or headless environments, credentials come from the environment:
-export CF_API_TOKEN="your-cloudflare-api-token"
-export CF_ACCOUNT_ID="your-cloudflare-account-id"
+export CLOUDFLARE_API_TOKEN="your-cloudflare-api-token"
+export CLOUDFLARE_ACCOUNT_ID="your-cloudflare-account-id"
 
 # Run the full build + deploy pipeline
 gendoc-template/scripts/deploy.sh
@@ -352,6 +444,38 @@ gendoc-template/scripts/deploy.sh
 
 The script deploys the built site to Cloudflare Pages and prints the deployed URL
 (typically `https://<project-name>.pages.dev`).
+
+### GitHub Actions
+
+This repository's `.github/workflows/build.yml` validates every built-in theme, compiles
+the Python hooks, and typechecks the Ask AI worker on pull requests and pushes to `develop`
+or `main`.
+
+Parent projects can call the reusable `.github/workflows/deploy.yml` workflow. Add this
+small wrapper to the parent repository as `.github/workflows/deploy.yml`:
+
+```yaml
+name: Deploy documentation
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  docs:
+    uses: GeniusVentures/gendoc-template/.github/workflows/deploy.yml@develop
+    with:
+      template-path: gendoc-template
+    secrets:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+The parent repository must contain `gendoc.yml` at its root and the template as a direct
+child (normally the `gendoc-template` submodule). Add `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` as GitHub Actions secrets. Pin the reusable workflow to a release
+tag or commit SHA for production once the desired template version is released.
 
 ## Host Project .gitignore
 
@@ -395,6 +519,9 @@ your-project/                   # HOST PROJECT ROOT
 │   ├── mkdocs.yml              # MkDocs config with Material theme
 │   ├── requirements.txt        # Python dependencies
 │   ├── wrangler.toml.template  # Pages config template
+│   ├── .github/workflows/
+│   │   ├── build.yml           # Theme, Python, and Ask worker CI
+│   │   └── deploy.yml          # Reusable parent-project Cloudflare deployment
 │   ├── scripts/
 │   │   ├── setup.sh            # One-time Cloudflare setup (Pages + ask worker)
 │   │   ├── build.sh            # Full build pipeline
@@ -407,7 +534,8 @@ your-project/                   # HOST PROJECT ROOT
 │   │   ├── generate-index.sh   # index.md regeneration from headings
 │   │   ├── read-yaml.py        # YAML config reader
 │   │   └── load-gendoc-config.py   # MkDocs hook
-│   ├── stylesheets/            # theme.css (MkDocs + Ask drawer theme)
+│   ├── stylesheets/            # Shared, theme-independent base.css
+│   ├── themes/                 # Selectable default, indigo, and protocol presets
 │   ├── javascripts/            # Theme enhancements (+ generated ask/ output, gitignored)
 │   ├── doxygen-template/       # Doxygen config template
 │   └── README.md
@@ -425,7 +553,7 @@ your-project/                   # HOST PROJECT ROOT
 | `Doxygen failed` | `paths.cpp_source` points at a non-existent or empty directory | Verify `paths.cpp_source` points at existing C++ source |
 | `doxybook2 failed` | doxybook2 not installed or wrong version | Download the [GeniusVentures fork v1.6.3](https://github.com/GeniusVentures/doxybook2/releases/tag/v1.6.3) release binaries (the upstream `npm` package is not used) |
 | `wrangler: command not found` | Wrangler not installed | Run `npm install -g wrangler` |
-| `Error: CF_API_TOKEN environment variable is not set` | Missing deploy credentials | `export CF_API_TOKEN="your-token"` and `export CF_ACCOUNT_ID="your-account-id"` |
+| Wrangler authentication fails in CI | Missing deploy credentials | Add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as repository secrets |
 | `Warning: gendoc.yml not found` (during mkdocs serve) | The MkDocs hook looks for gendoc.yml at the host root and falls back to defaults if missing | Create `gendoc.yml` at the host project root, or edit `mkdocs.yml` directly if you prefer |
 | `No SUMMARY.md found` (warning) | Hand-written docs directory has no `SUMMARY.md` | Create `SUMMARY.md` in your hand-written docs directory (see [Hand-Written Docs](#hand-written-docs)) |
 | `22 entries need editorial attention` (catalog) | `llms-meta.json` has un-reviewed entries | Run `/update-catalogs` in Claude Code to fill in descriptions and categories |

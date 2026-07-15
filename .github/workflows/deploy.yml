@@ -1,0 +1,113 @@
+name: Build and deploy GenDoc
+
+on:
+  workflow_call:
+    inputs:
+      template-path:
+        description: Path to the gendoc-template checkout in the parent repository
+        required: false
+        default: gendoc-template
+        type: string
+      python-version:
+        description: Python version used for the documentation build
+        required: false
+        default: "3.11"
+        type: string
+      node-version:
+        description: Node.js version used for Wrangler and the Ask widget
+        required: false
+        default: "20"
+        type: string
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        description: Cloudflare API token with Pages edit access
+        required: true
+      CLOUDFLARE_ACCOUNT_ID:
+        description: Cloudflare account identifier
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-deploy-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      TEMPLATE_PATH: ${{ inputs.template-path }}
+
+    steps:
+      - name: Checkout parent repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Validate parent-project layout
+        run: |
+          test -f gendoc.yml
+          test -f "$TEMPLATE_PATH/mkdocs.yml"
+          test -f "$TEMPLATE_PATH/scripts/build.sh"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: pip
+          cache-dependency-path: ${{ inputs.template-path }}/requirements.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install -r "$TEMPLATE_PATH/requirements.txt"
+          python -m pip install -e "$TEMPLATE_PATH/plugins"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq doxygen
+          bash "$TEMPLATE_PATH/scripts/install-deps.sh"
+
+      - name: Install Wrangler
+        run: npm install --global wrangler@4
+
+      - name: Generate Wrangler configuration
+        run: |
+          python - "$TEMPLATE_PATH" <<'PYTHON'
+          from pathlib import Path
+          import sys
+          import yaml
+
+          template_root = Path(sys.argv[1])
+          config = yaml.safe_load(Path("gendoc.yml").read_text(encoding="utf-8")) or {}
+          cloudflare = config.get("deploy", {}).get("cloudflare", {})
+          project = cloudflare.get("pages_project_name")
+          if not project:
+              raise SystemExit("deploy.cloudflare.pages_project_name is required")
+
+          compatibility_date = cloudflare.get("compatibility_date", "2024-01-01")
+          site_dir = config.get("mkdocs", {}).get("site_dir", "site")
+          source = (template_root / "wrangler.toml.template").read_text(encoding="utf-8")
+          output = (
+              source.replace("{{PAGES_PROJECT_NAME}}", str(project))
+              .replace("{{COMPATIBILITY_DATE}}", str(compatibility_date))
+              .replace("{{SITE_DIR}}", str(site_dir))
+          )
+          (template_root / "wrangler.toml").write_text(output, encoding="utf-8")
+          PYTHON
+
+      - name: Build documentation
+        run: bash "$TEMPLATE_PATH/scripts/build.sh"
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bash "$TEMPLATE_PATH/scripts/deploy.sh"
