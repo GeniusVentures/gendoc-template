@@ -176,3 +176,39 @@
 
 /* ── Content bottom margin ───────────────────────────────────────────────── */
 .md-content__inner { padding-bottom: 4rem; }
+
+/* ── Ask AI Drawer default variables ───────────────────────────────────────
+   Themes override these in themes/<name>.css.  The widget's shadow DOM
+   inherits custom properties from :root automatically. */
+:root {
+  --ask-accent: #2f6fed;
+  --ask-on-accent: #fff;
+  --ask-icon: ✨;
+  --ask-font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --ask-drawer-bg: #fff;
+  --ask-drawer-fg: #16232e;
+  --ask-drawer-border: #d6dde3;
+  --ask-msg-bg: #f1f4f7;
+  --ask-msg-border: #e2e8ee;
+  --ask-code-bg: #e6ebf1;
+  --ask-input-bg: #fff;
+  --ask-input-border: #d6dde3;
+  --ask-thinking-bg: #f4f6f8;
+  --ask-session-bg: #f8f9fb;
+  --ask-session-border: #e2e8ee;
+  --ask-session-item-border: #eef1f5;
+  --ask-session-active: #e8ecf1;
+  --ask-session-hover: #eef1f5;
+  --ask-muted-fg: #6b7b8b;
+  --ask-danger: #cc6666;
+
+  --ask-dark-bg: #1a2129;
+  --ask-dark-fg: #dbe4ec;
+  --ask-dark-border: #2c3944;
+  --ask-dark-msg-bg: #232d38;
+  --ask-dark-session-bg: #19212b;
+  --ask-dark-session-item-border: #1e2732;
+  --ask-dark-muted-fg: #8fa1b0;
+  --ask-dark-thinking-fg: #a0b0c0;
+  --ask-dark-link: #6fa8f0;
+}

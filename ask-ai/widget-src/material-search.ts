@@ -37,7 +37,8 @@ export function installMaterialSearchHook(title: string, target: SearchHookTarge
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "md-search__ask";
-    btn.textContent = `💬 ${title}`;
+    const icon = getComputedStyle(document.documentElement).getPropertyValue('--ask-icon').trim() || '💬';
+    btn.textContent = `${icon} ${title}`;
     btn.title = `${title}: ask a question about the docs`;
     // Inline styles to keep this self-contained — no stylesheet dependency.
     btn.style.cssText =

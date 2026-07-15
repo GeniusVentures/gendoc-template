@@ -139,7 +139,8 @@ export class DrawerUI {
       </section>`;
         const fragment = template.content;
         const title = this.config.title;
-        fragment.querySelector(".fab").textContent = `💬 ${title}`;
+        const icon = getComputedStyle(document.documentElement).getPropertyValue('--ask-icon').trim() || '💬';
+        fragment.querySelector(".fab").textContent = `${icon} ${title}`;
         fragment.querySelector(".drawer").setAttribute("aria-label", title);
         fragment.querySelector(".head b").textContent = title;
         const input = fragment.querySelector("input");

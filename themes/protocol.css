@@ -166,6 +166,7 @@ body, .md-typeset, .md-header, .md-nav, .md-search__input, .md-tabs {
 :root {
   --gnus-page-gutter-min: 2rem;
   --gnus-toc-width: 16rem;
+  --ask-icon: ✨;
 }
 .md-sidebar--primary {
   padding-left: var(--gnus-page-gutter-min);
@@ -666,6 +667,9 @@ body, .md-typeset, .md-header, .md-nav, .md-search__input, .md-tabs {
 /* ── Ask AI Drawer theme variables ────────────────────────────────────────── */
 :root {
   --ask-accent: #4f46e5;
+  --ask-on-accent: #fff;
+  --ask-icon: ✨;
+  --ask-font: 'Inter', system-ui, -apple-system, sans-serif;
   --ask-drawer-bg: #fff;
   --ask-drawer-fg: #0f172a;
   --ask-drawer-border: #e5e7eb;
@@ -690,4 +694,6 @@ body, .md-typeset, .md-header, .md-nav, .md-search__input, .md-tabs {
   --ask-dark-session-bg: #0b0d12;
   --ask-dark-session-item-border: #1e2230;
   --ask-dark-muted-fg: #94a3b8;
+  --ask-dark-thinking-fg: #a0b0c0;
+  --ask-dark-link: #6fa8f0;
 }

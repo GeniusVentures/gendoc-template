@@ -6,12 +6,12 @@
  */
 export const DRAWER_CSS = `
   :host { all: initial; }
-  * { box-sizing: border-box; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  * { box-sizing: border-box; font-family: var(--ask-font, system-ui, -apple-system, "Segoe UI", sans-serif); }
 
   .fab {
     position: fixed; right: 20px; bottom: 20px; z-index: 9998;
     border: 0; border-radius: 24px; padding: 12px 20px;
-    font-size: 14px; font-weight: 600; cursor: pointer; color: #fff;
+    font-size: 14px; font-weight: 600; cursor: pointer; color: var(--ask-on-accent, #fff);
     background: var(--ask-accent, #2f6fed);
     box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
     white-space: nowrap;
@@ -38,13 +38,13 @@ export const DRAWER_CSS = `
 
   .head {
     flex: none; padding: 14px 16px;
-    background: var(--ask-accent, #2f6fed); color: #fff;
+    background: var(--ask-accent, #2f6fed); color: var(--ask-on-accent, #fff);
     display: flex; justify-content: space-between; align-items: center;
   }
   .head b { font-size: 14px; }
   .head-buttons { display: flex; gap: 4px; align-items: center; }
   .head button {
-    background: none; border: 0; color: #fff; cursor: pointer;
+    background: none; border: 0; color: var(--ask-on-accent, #fff); cursor: pointer;
     font-size: 16px; line-height: 1; padding: 4px 6px; opacity: .9;
   }
   .head button:hover { opacity: 1; }
@@ -87,7 +87,7 @@ export const DRAWER_CSS = `
     white-space: pre-wrap; word-wrap: break-word;
   }
   .message.user {
-    align-self: flex-end; color: #fff;
+    align-self: flex-end; color: var(--ask-on-accent, #fff);
     background: var(--ask-accent, #2f6fed);
     border-bottom-right-radius: 3px;
   }
@@ -156,7 +156,7 @@ export const DRAWER_CSS = `
   form button[type=submit] {
     border: 0; border-radius: 8px; padding: 9px 14px;
     font-weight: 600; font-size: 13px; cursor: pointer;
-    background: var(--ask-accent, #2f6fed); color: #fff;
+    background: var(--ask-accent, #2f6fed); color: var(--ask-on-accent, #fff);
   }
   form button[type=submit]:disabled { opacity: .5; }
 
@@ -178,6 +178,6 @@ export const DRAWER_CSS = `
     --ask-session-hover: var(--ask-dark-session-item-border, #1e2732);
     --ask-muted-fg: var(--ask-dark-muted-fg, #8fa1b0);
   }
-  .drawer[data-theme="dark"] .thinking pre { color: #a0b0c0; }
-  .drawer[data-theme="dark"] .sources a { color: #6fa8f0; }
+  .drawer[data-theme="dark"] .thinking pre { color: var(--ask-dark-thinking-fg, #a0b0c0); }
+  .drawer[data-theme="dark"] .sources a { color: var(--ask-dark-link, #6fa8f0); }
 `;
