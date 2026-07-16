@@ -39,6 +39,15 @@ if ! wrangler whoami &>/dev/null; then
     exit 1
 fi
 
+# ── CLI overrides ────────────────────────────────────────────────────────────
+CLI_ENV=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --env) CLI_ENV="$2"; shift 2 ;;
+        *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+done
+
 # ── Read configuration from gendoc.yml ──────────────────────────────────────────
 read -r PROJECT_NAME DEPLOY_ENV <<< "$(python3 -c "
 import yaml, sys
@@ -48,6 +57,9 @@ name = cfg.get('project', {}).get('name', '')
 env  = cfg.get('deploy', {}).get('cloudflare', {}).get('env', 'production')
 print(name, env)
 " "$GENDOC_YML")"
+
+# CLI --env flag overrides gendoc.yml
+DEPLOY_ENV="${CLI_ENV:-$DEPLOY_ENV}"
 
 echo "Deploying ${PROJECT_NAME:-(unnamed)} to Cloudflare Pages (${DEPLOY_ENV})..."
 
