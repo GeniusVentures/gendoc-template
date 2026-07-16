@@ -102,6 +102,22 @@ export const DRAWER_CSS = `
     font-family: ui-monospace, Menlo, monospace; font-size: 12px;
   }
   .message.assistant a { color: var(--ask-accent, #2f6fed); }
+  .message.assistant h1, .message.assistant h2, .message.assistant h3, .message.assistant h4 { margin: 8px 0 4px; font-weight: 600; line-height: 1.3; }
+  .message.assistant h1 { font-size: 16px; }
+  .message.assistant h2 { font-size: 15px; }
+  .message.assistant h3 { font-size: 14px; }
+  .message.assistant h4 { font-size: 13px; }
+  .message.assistant ul, .message.assistant ol { margin: 4px 0; padding-left: 18px; }
+  .message.assistant li { margin: 2px 0; }
+  .message.assistant p { margin: 4px 0; }
+  .message.assistant table { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 12px; }
+  .message.assistant th, .message.assistant td { border: 1px solid var(--ask-drawer-border, #d6dde3); padding: 4px 8px; text-align: left; }
+  .message.assistant th { background: var(--ask-code-bg, #e6ebf1); font-weight: 600; }
+  .message.assistant tr:nth-child(even) td { background: var(--ask-msg-bg, #f1f4f7); }
+  .message.assistant pre { margin: 6px 0; padding: 8px 10px; background: var(--ask-code-bg, #e6ebf1); border-radius: 4px; overflow-x: auto; font-size: 12px; }
+  .message.assistant pre code { background: none; padding: 0; }
+  .message.assistant blockquote { margin: 6px 0; padding: 4px 10px; border-left: 3px solid var(--ask-accent, #2f6fed); color: var(--ask-muted-fg, #6b7b8b); }
+  .message.assistant hr { border: 0; border-top: 1px solid var(--ask-drawer-border, #d6dde3); margin: 8px 0; }
 
   .thinking {
     margin: 0 0 8px 0; font-size: 11px; color: var(--ask-muted-fg, #6b7b8b);

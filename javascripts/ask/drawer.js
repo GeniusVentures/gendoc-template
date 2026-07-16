@@ -337,7 +337,7 @@ export class DrawerUI {
             else if (providerEl) {
                 providerEl.remove();
             }
-            body.innerHTML = renderInlineMarkdown(message.text || "…");
+            body.innerHTML = renderMarkdown(message.text || "…");
         }
         element.querySelector(".sources")?.remove();
         if (message.sources.length > 0) {
@@ -384,12 +384,142 @@ function buildSourceList(sources) {
     }
     return details;
 }
-/** Escape everything, then re-introduce a small safe inline subset. */
-function renderInlineMarkdown(text) {
-    return escapeHtml(text)
-        .replace(/`([^`\n]+)`/g, "<code>$1</code>")
+/** Render markdown to HTML — handles tables, headings, lists, code blocks, and inline formatting. */
+function renderMarkdown(text) {
+    const blocks = splitBlocks(text);
+    return blocks.map(renderBlock).join("\n");
+}
+function splitBlocks(text) {
+    const blocks = [];
+    let buf = "";
+    let inFence = false;
+    let inTable = false;
+    for (const line of text.split("\n")) {
+        if (/^```/.test(line)) {
+            inFence = !inFence;
+        }
+        if (inFence) {
+            buf += (buf ? "\n" : "") + line;
+            continue;
+        }
+        if (!inTable && /^\|.*\|$/.test(line.trim())) {
+            inTable = true;
+        }
+        if (inTable && line.trim() === "") {
+            inTable = false;
+        }
+        if (inTable) {
+            buf += (buf ? "\n" : "") + line;
+            continue;
+        }
+        if (line.trim() === "") {
+            if (buf)
+                blocks.push(buf);
+            buf = "";
+            continue;
+        }
+        buf += (buf ? "\n" : "") + line;
+    }
+    if (buf)
+        blocks.push(buf);
+    return blocks;
+}
+function renderBlock(block) {
+    const lines = block.split("\n");
+    const first = lines[0].trim();
+    // Fenced code block
+    if (/^```/.test(first) && /```$/.test(lines[lines.length - 1].trim())) {
+        const code = lines.slice(1, -1).join("\n");
+        return `<pre><code>${escapeHtml(code)}</code></pre>`;
+    }
+    // Table
+    if (lines.length >= 2 && /^\|.*\|$/.test(first) && /^\|[-:| ]+\|$/.test(lines[1].trim())) {
+        return renderTable(lines);
+    }
+    // Heading
+    const h = first.match(/^(#{1,4})\s+(.+)/);
+    if (h) {
+        return `<h${h[1].length}>${renderInline(h[2])}</h${h[1].length}>`;
+    }
+    // HR
+    if (/^[-*]{3,}$/.test(first)) {
+        return "<hr>";
+    }
+    // Unordered list
+    if (/^[-*]\s/.test(first)) {
+        const items = [];
+        let item = "";
+        for (const line of lines) {
+            const m = line.match(/^[-*]\s+(.*)/);
+            if (m) {
+                if (item)
+                    items.push(item);
+                item = m[1];
+            }
+            else {
+                item += " " + line.trim();
+            }
+        }
+        if (item)
+            items.push(item);
+        return `<ul>${items.map(i => `<li>${renderInline(i)}</li>`).join("")}</ul>`;
+    }
+    // Ordered list
+    if (/^\d+\.\s/.test(first)) {
+        const items = [];
+        let item = "";
+        for (const line of lines) {
+            const m = line.match(/^\d+\.\s+(.*)/);
+            if (m) {
+                if (item)
+                    items.push(item);
+                item = m[1];
+            }
+            else {
+                item += " " + line.trim();
+            }
+        }
+        if (item)
+            items.push(item);
+        return `<ol>${items.map(i => `<li>${renderInline(i)}</li>`).join("")}</ol>`;
+    }
+    // Blockquote
+    if (first.startsWith("> ")) {
+        const inner = lines.map(l => l.replace(/^> ?/, "")).join("\n");
+        return `<blockquote>${renderInline(inner)}</blockquote>`;
+    }
+    // Paragraph
+    return `<p>${renderInline(lines.join(" "))}</p>`;
+}
+function renderTable(lines) {
+    const headerCells = lines[0].split("|").filter(c => c.trim() !== "").map(c => c.trim());
+    const bodyRows = lines.slice(2);
+    let html = "<table><thead><tr>";
+    for (const cell of headerCells) {
+        html += `<th>${renderInline(cell)}</th>`;
+    }
+    html += "</tr></thead><tbody>";
+    for (const row of bodyRows) {
+        const cells = row.split("|").filter(c => c.trim() !== "").map(c => c.trim());
+        if (cells.length === 0)
+            continue;
+        html += "<tr>";
+        for (const cell of cells) {
+            html += `<td>${renderInline(cell)}</td>`;
+        }
+        html += "</tr>";
+    }
+    html += "</tbody></table>";
+    return html;
+}
+function renderInline(text) {
+    const escaped = escapeHtml(text);
+    // Bold first (handles ** inside links etc), then links, then code
+    return escaped
         .replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
-        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+        .replace(/\*([^*\n]+)\*/g, "<i>$1</i>")
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+        .replace(/`([^`\n]+)`/g, "<code>$1</code>");
 }
 function escapeHtml(text) {
     const replacements = {

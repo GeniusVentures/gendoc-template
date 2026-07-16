@@ -167,7 +167,6 @@ with open(sys.argv[1], 'r') as f:
 tokens = {
     '{{WORKER_NAME}}': sys.argv[2],
     '{{COMPATIBILITY_DATE}}': sys.argv[3],
-    '{{LLMS_URL}}': '/llms.txt',
     '{{SITE_URL}}': sys.argv[4],
     '{{ALLOWED_ORIGINS}}': sys.argv[5],
     '{{BOT_NAME}}': sys.argv[6],

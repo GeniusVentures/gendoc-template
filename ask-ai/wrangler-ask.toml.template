@@ -6,7 +6,6 @@ main = "gendoc-template/ask-ai/worker/src/index.ts"
 compatibility_date = "{{COMPATIBILITY_DATE}}"
 
 [vars]
-LLMS_URL = "{{LLMS_URL}}"
 ALLOWED_ORIGINS = "{{ALLOWED_ORIGINS}}"
 SITE_URL = "{{SITE_URL}}"
 BOT_NAME = "{{BOT_NAME}}"
