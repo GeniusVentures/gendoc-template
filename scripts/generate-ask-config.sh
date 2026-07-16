@@ -50,16 +50,12 @@ if not llms.get("enabled") or not ask.get("enabled"):
     sys.exit("ERROR: llms.enabled and llms.ask.enabled must both be true in gendoc.yml")
 
 site_url = (llms.get("site_url") or "").rstrip("/")
-if not site_url:
-    sys.exit("ERROR: llms.site_url is required")
 
 pages_name = cf.get("pages_project_name") or "gendoc"
 values = {
     "WORKER_NAME": ask.get("worker_name") or f"{pages_name}-ask",
     "COMPATIBILITY_DATE": cf.get("compatibility_date") or "2026-06-01",
-    "LLMS_URL": f"{site_url}/llms.txt",
-    "SITE_URL": site_url,
-    "ALLOWED_ORIGINS": ",".join(ask.get("allowed_origins") or [site_url]),
+    "ALLOWED_ORIGINS": ",".join(ask.get("allowed_origins") or ([site_url] if site_url else [])),
     "BOT_NAME": ask.get("title") or f"{project.get('name', 'Docs')} Assistant",
     "PROVIDERS": ask.get("providers") or "gemini,openrouter",
     "GEMINI_MODEL": ask.get("gemini_model") or "gemini-2.5-flash",
@@ -80,8 +76,6 @@ fi
 
 sed -e "s|{{WORKER_NAME}}|$WORKER_NAME|g" \
     -e "s|{{COMPATIBILITY_DATE}}|$COMPATIBILITY_DATE|g" \
-    -e "s|{{LLMS_URL}}|$LLMS_URL|g" \
-    -e "s|{{SITE_URL}}|$SITE_URL|g" \
     -e "s|{{ALLOWED_ORIGINS}}|$ALLOWED_ORIGINS|g" \
     -e "s|{{BOT_NAME}}|$BOT_NAME|g" \
     -e "s|{{PROVIDERS}}|$PROVIDERS|g" \

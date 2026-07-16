@@ -129,11 +129,7 @@ ASK_ENABLED=$(read_yaml "llms.ask.enabled")
 ASK_WORKER_NAME=""
 
 if [ "$LLMS_ENABLED" = "true" ] && [ "$ASK_ENABLED" = "true" ]; then
-    LLMS_SITE_URL=$(read_yaml "llms.site_url")
-    if [ -z "$LLMS_SITE_URL" ]; then
-        echo "Error: llms.site_url is required when llms.ask.enabled is true" >&2
-        exit 1
-    fi
+    LLMS_SITE_URL="$(read_yaml "llms.site_url")"
     LLMS_SITE_URL="${LLMS_SITE_URL%/}"
 
     ASK_WORKER_NAME=$(read_yaml "llms.ask.worker_name")
@@ -167,19 +163,18 @@ with open(sys.argv[1], 'r') as f:
 tokens = {
     '{{WORKER_NAME}}': sys.argv[2],
     '{{COMPATIBILITY_DATE}}': sys.argv[3],
-    '{{SITE_URL}}': sys.argv[4],
-    '{{ALLOWED_ORIGINS}}': sys.argv[5],
-    '{{BOT_NAME}}': sys.argv[6],
-    '{{PROVIDERS}}': sys.argv[7],
-    '{{GEMINI_MODEL}}': sys.argv[8],
-    '{{OPENROUTER_MODELS}}': sys.argv[9],
+    '{{ALLOWED_ORIGINS}}': sys.argv[4],
+    '{{BOT_NAME}}': sys.argv[5],
+    '{{PROVIDERS}}': sys.argv[6],
+    '{{GEMINI_MODEL}}': sys.argv[7],
+    '{{OPENROUTER_MODELS}}': sys.argv[8],
 }
 for token, value in tokens.items():
     content = content.replace(token, value)
 
 # When a custom endpoint is configured, append a [[routes]] section so
 # traffic to that domain+path reaches this worker.
-endpoint = sys.argv[11]
+endpoint = sys.argv[10]
 if endpoint:
     parsed = urlparse(endpoint)
     host = parsed.hostname or ''
@@ -188,9 +183,9 @@ if endpoint:
     zone = '.'.join(host.split('.')[-2:])
     content += f'\n[[routes]]\npattern = \"{host}{route_path}\"\nzone_name = \"{zone}\"\n'
 
-with open(sys.argv[10], 'w') as f:
+with open(sys.argv[9], 'w') as f:
     f.write(content)
-" "$ASK_TPL" "$ASK_WORKER_NAME" "$COMPATIBILITY_DATE" "$LLMS_SITE_URL" \
+" "$ASK_TPL" "$ASK_WORKER_NAME" "$COMPATIBILITY_DATE" \
       "$ASK_ORIGINS" "$ASK_BOT_NAME" "$ASK_PROVIDERS" "$ASK_GEMINI_MODEL" \
       "$ASK_OPENROUTER_MODELS" "$ASK_OUT" "$ASK_ENDPOINT_CFG"
 
