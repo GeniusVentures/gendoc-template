@@ -3,6 +3,9 @@
  * bar's .md-search__options that opens the Ask drawer with the current
  * search query.
  *
+ * Fuzzy typo-correction is handled separately by search-fuzzy.js (loaded
+ * via injectors.js before Material initialises).
+ *
  * Every selector is guarded and the whole install is best-effort: if a
  * Material update renames these hooks, the button simply never appears
  * and the floating button continues unaffected. Nothing else in the

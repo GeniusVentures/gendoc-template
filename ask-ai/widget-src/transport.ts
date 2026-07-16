@@ -1,5 +1,6 @@
 import { LIMITS } from "./config.js";
 import type { AskConfig, AskRequest, ChatTurn, SseEvent } from "./types.js";
+import { searchHints } from "./site-search.js";
 
 /**
  * A transport answers one question as a stream of {@link SseEvent}s.
@@ -23,7 +24,9 @@ class RemoteTransport implements AskTransport {
   constructor(private readonly config: AskConfig) {}
 
   async *ask(question: string, history: readonly ChatTurn[]): AsyncGenerator<SseEvent> {
-    const body: AskRequest = { question, history };
+    const corrected = (window as any).fuzzyCorrect ? (window as any).fuzzyCorrect(question) : question;
+    const hints = await searchHints(corrected);
+    const body: AskRequest = { question, history, search_hints: hints || undefined };
     const res = await fetch(this.config.endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

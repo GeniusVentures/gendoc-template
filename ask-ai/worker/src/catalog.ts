@@ -106,9 +106,10 @@ export async function fetchDoc(entry: CatalogEntry, env: Env, origin: string): P
       return { ...entry, text: cmap[entry.url] };
     }
 
-    const docUrl = entry.url.startsWith('/')
-      ? new URL(entry.url, env.SITE_URL || origin).href
-      : entry.url;
+    // Resolve any URL without a scheme (relative, root-relative, protocol-relative).
+    const docUrl = /^https?:\/\//i.test(entry.url)
+      ? entry.url
+      : new URL(entry.url, env.SITE_URL || origin).href;
 
     const res = await fetch(docUrl, {
       headers: { 'User-Agent': 'gendoc-ask-worker/1.0' },

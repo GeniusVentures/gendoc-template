@@ -11,7 +11,7 @@
 #}
 {% block libs %}
   {% if config.extra.gzip_json %}
-    <script src="{{ '/javascripts/fetch-gzip.js' | url }}"></script>
+    <script src="{{ '/javascripts/ask/injectors.js' | url }}"></script>
   {% endif %}
   {{ super() }}
 {% endblock %}

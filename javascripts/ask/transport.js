@@ -1,4 +1,5 @@
 import { LIMITS } from "./config.js";
+import { searchHints } from "./site-search.js";
 /** Pick the best available transport, or null if none can work. */
 export function createTransport(config) {
     if (config.endpoint)
@@ -13,7 +14,9 @@ class RemoteTransport {
         this.config = config;
     }
     async *ask(question, history) {
-        const body = { question, history };
+        const corrected = window.fuzzyCorrect ? window.fuzzyCorrect(question) : question;
+        const hints = await searchHints(corrected);
+        const body = { question, history, search_hints: hints || undefined };
         const res = await fetch(this.config.endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },

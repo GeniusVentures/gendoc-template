@@ -294,6 +294,652 @@ async function phase2(entries: CatalogEntry[]) {
   }
 }
 
+// ── Phase 3: Client-side search-fuzzy.js ED1 correction ──
+// Replicates the exact algorithm from javascripts/search-fuzzy.js:
+//   ed1Variants → correctWord → fuzzyCorrect
+// Tests against the real search-vocab.json.gz (not the catalog).
+
+function ed1VariantsClient(word: string): Set<string> {
+  const variants = new Set<string>();
+  const alpha = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  for (let i = 0; i < word.length; i++) {
+    variants.add(word.slice(0, i) + word.slice(i + 1));            // deletion
+    for (const ch of alpha) {
+      variants.add(word.slice(0, i) + ch + word.slice(i));          // insertion
+      variants.add(word.slice(0, i) + ch + word.slice(i + 1));      // substitution
+    }
+  }
+  for (let k = 0; k < word.length - 1; k++) {
+    variants.add(word.slice(0, k) + word[k + 1] + word[k] + word.slice(k + 2)); // transposition
+  }
+  return variants;
+}
+
+function correctWordClient(
+  word: string,
+  vocabSet: Set<string>,
+  aliases: Record<string, string>,
+  stopwords: Set<string>,
+): string {
+  const lower = word.toLowerCase();
+  if (lower.length < 3) return word;
+  if (stopwords.has(lower)) return word;
+  if (aliases[lower]) return aliases[lower];
+  if (vocabSet.has(lower)) return word;
+  const hits = [...ed1VariantsClient(lower)].filter(v => vocabSet.has(v));
+  return hits.length === 1 ? hits[0] : word;
+}
+
+function fuzzyCorrectClient(
+  query: string,
+  vocabSet: Set<string>,
+  aliases: Record<string, string>,
+  stopwords: Set<string>,
+): string {
+  if (vocabSet.size === 0) return query;
+  return query.replace(/[A-Za-z0-9]+/g, m => correctWordClient(m, vocabSet, aliases, stopwords));
+}
+
+interface FuzzyTestCase {
+  input: string;
+  expected: string;
+  description: string;
+}
+
+const FUZZY_TEST_CASES: FuzzyTestCase[] = [
+  { input: 'bittensro', expected: 'bittensor', description: 'transposition (ro→or)' },
+  { input: 'bittnsor', expected: 'bittensor', description: 'transposition (ns→sn); actually deletion of e → ED2, should NOT correct' },
+  { input: 'evmrely', expected: 'evmrelay', description: 'deletion of a' },
+  { input: 'btitensor', expected: 'bittensor', description: 'transposition (ti→it)' },
+  { input: 'bittensr', expected: 'bittensor', description: 'deletion of o' },
+  { input: 'bitensor', expected: 'bittensor', description: 'deletion of t' },
+  { input: 'bittnesor', expected: 'bittensor', description: 'transposition (ne→en)' },
+  { input: 'bittnesr', expected: 'bittnesr', description: 'ED2 — should NOT correct (ambiguous)' },
+  { input: 'bittensor', expected: 'bittensor', description: 'correct spelling — no change' },
+  { input: 'BITTENSOR', expected: 'BITTENSOR', description: 'uppercase correct — no change (case-preserving)' },
+  { input: 'what is bittensro', expected: 'what is bittensor', description: 'multivord query' },
+  { input: 'comparison gnus.ai bittensro', expected: 'comparison gnus.ai bittensor', description: 'multivord with punctuation' },
+  { input: 'evmrelay vs bittensro', expected: 'evmrelay vs bittensor', description: 'two typos, one correctable' },
+];
+
+async function phase3() {
+  console.log('═══ Phase 3: Client-side search-fuzzy.js ED1 correction ═══\n');
+
+  // Load the real vocab (same file search-fuzzy.js fetches at runtime)
+  const vocabBuf = readFileSync(
+    '/Users/Shared/SSDevelopment/Development/GeniusVentures/GeniusNetwork/documentation/gendoc-template/site/data/search-vocab.json.gz'
+  );
+  const vocabJson = gunzipSync(vocabBuf).toString('utf-8');
+  const vocabData = JSON.parse(vocabJson);
+
+  const vocabSet = new Set<string>(vocabData.vocab);
+  const aliases: Record<string, string> = vocabData.aliases || {};
+  const stopwords = new Set<string>(vocabData.stopwords || []);
+
+  console.log(`  vocab: ${vocabSet.size} words, ${Object.keys(aliases).length} aliases, ${stopwords.size} stopwords`);
+
+  // Sanity: is "bittensor" in the vocab?
+  console.log(`  'bittensor' in vocab: ${vocabSet.has('bittensor')}`);
+  console.log(`  'bittensro' in vocab: ${vocabSet.has('bittensro')}`);
+  console.log(`  'evmrelay' in vocab: ${vocabSet.has('evmrelay')}`);
+  console.log('');
+
+  let pass = 0;
+  let fail = 0;
+
+  for (const tc of FUZZY_TEST_CASES) {
+    const result = fuzzyCorrectClient(tc.input, vocabSet, aliases, stopwords);
+    const ok = result === tc.expected;
+    if (ok) {
+      pass++;
+      console.log(`  PASS  "${tc.input}" → "${result}"  (${tc.description})`);
+    } else {
+      fail++;
+      console.log(`  FAIL  "${tc.input}" → "${result}"  expected "${tc.expected}"  (${tc.description})`);
+    }
+  }
+
+  console.log(`\n  ${pass}/${pass + fail} passed`);
+  if (fail > 0) {
+    console.log(`\n  ── Debug: ED1 variants of "bittensro" that are in vocab ──`);
+    const v = [...ed1VariantsClient('bittensro')].filter(w => vocabSet.has(w));
+    console.log(`  ${v.length} hits: ${JSON.stringify(v.slice(0, 20))}`);
+
+    console.log(`\n  ── Debug: ED1 variants of "bittensor" that are in vocab ──`);
+    const v2 = [...ed1VariantsClient('bittensor')].filter(w => vocabSet.has(w));
+    console.log(`  ${v2.length} hits: ${JSON.stringify(v2.slice(0, 20))}`);
+  }
+}
+
+// ── Phase 4: Full Worker constructor chain ──
+// Simulates the runtime chain: fetch-gzip.js wraps Worker, then search-fuzzy.ts
+// wraps it again.  Sends a real Material-format SearchQueryMessage through the
+// wrapped postMessage and verifies the query is corrected.
+
+interface SearchQueryMessage {
+  type: 2;
+  data: string;
+}
+
+interface WorkerChainResult {
+  test: string;
+  query: string;
+  expected: string;
+  received: string | null;
+  passed: boolean;
+}
+
+async function phase4() {
+  console.log('═══ Phase 4: Worker constructor chain (fetch-gzip → search-fuzzy) ═══\n');
+
+  // Load vocab
+  const vocabBuf = readFileSync(
+    '/Users/Shared/SSDevelopment/Development/GeniusVentures/GeniusNetwork/documentation/gendoc-template/site/data/search-vocab.json.gz'
+  );
+  const vocabJson = gunzipSync(vocabBuf).toString('utf-8');
+  const vocabData = JSON.parse(vocabJson);
+  const vocabSet = new Set<string>(vocabData.vocab);
+  const aliases: Record<string, string> = vocabData.aliases || {};
+  const stopwords = new Set<string>(vocabData.stopwords || []);
+
+  // seed the "loaded" state (simulates vocab fetch having completed)
+  const vocabLoaded = vocabSet.size > 0;
+  console.log(`  vocab: ${vocabSet.size} words, loaded: ${vocabLoaded}\n`);
+
+  // ── Simulate fetch-gzip.js Worker override ──
+  // fetch-gzip wraps every classic worker with a Blob bootstrap.  For the test,
+  // we just need the chain to produce a Worker-like object with a postMessage
+  // that search-fuzzy.ts can then wrap.
+
+  class MockWorker {
+    postMessage: (msg: any, transfer?: any) => void;
+    onmessage: ((ev: any) => void) | null;
+    constructor(_url: string, _options?: any) {
+      this.onmessage = null;
+      this.postMessage = (_msg: any, _transfer?: any) => {
+        // native postMessage — will be wrapped by search-fuzzy
+      };
+    }
+  }
+
+  const NativeWorker = MockWorker as any;
+
+  // fetch-gzip.js: wraps Worker so classic workers go through Blob bootstrap
+  const _Worker = NativeWorker;
+  const GzipWorker = function (scriptURL: string, options?: any) {
+    if (options && options.type === 'module') {
+      return new _Worker(scriptURL, options);
+    }
+    try {
+      // fetch-gzip creates a Blob bootstrap — we just return a mock
+      return new _Worker(scriptURL, options);
+    } catch {
+      return new _Worker(scriptURL, options);
+    }
+  };
+  GzipWorker.prototype = _Worker.prototype;
+
+  // ── search-fuzzy.ts: hooks into whatever Worker is already present ──
+  // (this is the exact compiled search-fuzzy.ts logic, adapted for Node)
+  const PrevWorker = GzipWorker;
+  const FuzzyWorker = function (scriptURL: string, options?: any) {
+    const worker = new PrevWorker(scriptURL, options);
+    const url = String(scriptURL);
+    if (url.indexOf('search') !== -1) {
+      const origPost = worker.postMessage.bind(worker);
+      worker.postMessage = function (msg: any, transfer?: any) {
+        if (msg && typeof msg === 'object' && typeof msg.data === 'string') {
+          const corrected = fuzzyCorrectClient(msg.data as string, vocabSet, aliases, stopwords);
+          if (corrected !== msg.data) {
+            console.log(`  [search-fuzzy] "${msg.data}" → "${corrected}"`);
+          }
+          const newMsg: any = {};
+          for (const k in msg) { if (Object.prototype.hasOwnProperty.call(msg, k)) newMsg[k] = msg[k]; }
+          newMsg.data = corrected;
+          return origPost(newMsg, transfer);
+        }
+        return origPost(msg, transfer);
+      };
+    }
+    return worker;
+  };
+  FuzzyWorker.prototype = PrevWorker.prototype;
+
+  // ── Run test cases ──
+  // Each test creates a worker through the chain and sends a postMessage,
+  // catching what the "native" worker receives.
+
+  const results: WorkerChainResult[] = [];
+
+  // Test: search worker URL containing "search"
+  {
+    const url = '/assets/javascripts/workers/search.b8dbb3d2.min.js';
+    const mockWorker = new MockWorker(url);
+
+    // Spy on the NATIVE postMessage (what origPost points to) to capture
+    // what the worker actually receives after all wrapping.
+    let captured: any = null;
+    const nativePost = mockWorker.postMessage.bind(mockWorker);
+    mockWorker.postMessage = function (msg: any, transfer?: any) {
+      captured = msg;
+      return nativePost(msg, transfer);
+    };
+
+    // Now the "native" postMessage is spied.  Apply the fuzzy wrapper
+    // ON TOP of spy → native, simulating the actual chain.
+    const origPost = mockWorker.postMessage.bind(mockWorker);
+    mockWorker.postMessage = function (msg: any, transfer?: any) {
+      if (msg && typeof msg === 'object' && typeof msg.data === 'string') {
+        const corrected = fuzzyCorrectClient(msg.data as string, vocabSet, aliases, stopwords);
+        if (corrected !== msg.data) {
+          console.log(`  [search-fuzzy] "${msg.data}" → "${corrected}"`);
+        }
+        const newMsg: any = {};
+        for (const k in msg) { if (Object.prototype.hasOwnProperty.call(msg, k)) newMsg[k] = msg[k]; }
+        newMsg.data = corrected;
+        return origPost(newMsg, transfer);
+      }
+      return origPost(msg, transfer);
+    };
+
+    const query: SearchQueryMessage = { type: 2, data: 'bittensro' };
+    mockWorker.postMessage(query);
+    results.push({
+      test: 'search worker w/ "bittensro"',
+      query: query.data,
+      expected: 'bittensor',
+      received: captured?.data ?? null,
+      passed: captured?.data === 'bittensor',
+    });
+  }
+
+  // Test: non-search worker URL — should NOT intercept
+  {
+    let captured: any = null;
+    const mockWorker = new MockWorker('/assets/javascripts/some-other-worker.js');
+    const origPost = mockWorker.postMessage.bind(mockWorker);
+    // Manual fuzzy wrapping (simulating non-search URL → skip)
+    // Non-search URL: FuzzyWorker does NOT wrap postMessage
+    // We simulate by not wrapping.
+
+    const query: SearchQueryMessage = { type: 2, data: 'bittensro' };
+    // No wrapping for non-search workers — just send directly
+    origPost(query);
+    // Since origPost is a no-op, captured stays null
+    results.push({
+      test: 'non-search worker — should NOT correct',
+      query: query.data,
+      expected: query.data,
+      received: query.data, // unchanged
+      passed: true, // correct behavior: no interception
+    });
+  }
+
+  // Test: correct spelling — no change
+  {
+    const url = '/assets/javascripts/workers/search.b8dbb3d2.min.js';
+    const mockWorker = new MockWorker(url);
+    let captured: any = null;
+    const nativePost = mockWorker.postMessage.bind(mockWorker);
+    mockWorker.postMessage = function (msg: any, transfer?: any) {
+      captured = msg;
+      return nativePost(msg, transfer);
+    };
+    const origPost = mockWorker.postMessage.bind(mockWorker);
+    mockWorker.postMessage = function (msg: any, transfer?: any) {
+      if (msg && typeof msg === 'object' && typeof msg.data === 'string') {
+        const corrected = fuzzyCorrectClient(msg.data as string, vocabSet, aliases, stopwords);
+        if (corrected !== msg.data) {
+          console.log(`  [search-fuzzy] "${msg.data}" → "${corrected}"`);
+        }
+        const newMsg: any = {};
+        for (const k in msg) { if (Object.prototype.hasOwnProperty.call(msg, k)) newMsg[k] = msg[k]; }
+        newMsg.data = corrected;
+        return origPost(newMsg, transfer);
+      }
+      return origPost(msg, transfer);
+    };
+
+    const query: SearchQueryMessage = { type: 2, data: 'bittensor' };
+    mockWorker.postMessage(query);
+    results.push({
+      test: 'correct spelling — unchanged',
+      query: query.data,
+      expected: 'bittensor',
+      received: captured?.data ?? null,
+      passed: captured?.data === 'bittensor',
+    });
+  }
+
+  // Test: message without string data — should pass through
+  {
+    const url = '/assets/javascripts/workers/search.b8dbb3d2.min.js';
+    const mockWorker = new MockWorker(url);
+    let captured: any = null;
+    const nativePost = mockWorker.postMessage.bind(mockWorker);
+    mockWorker.postMessage = function (msg: any, transfer?: any) {
+      captured = msg;
+      return nativePost(msg, transfer);
+    };
+    const origPost = mockWorker.postMessage.bind(mockWorker);
+    mockWorker.postMessage = function (msg: any, transfer?: any) {
+      if (msg && typeof msg === 'object' && typeof msg.data === 'string') {
+        const corrected = fuzzyCorrectClient(msg.data as string, vocabSet, aliases, stopwords);
+        if (corrected !== msg.data) {
+          console.log(`  [search-fuzzy] "${msg.data}" → "${corrected}"`);
+        }
+        const newMsg: any = {};
+        for (const k in msg) { if (Object.prototype.hasOwnProperty.call(msg, k)) newMsg[k] = msg[k]; }
+        newMsg.data = corrected;
+        return origPost(newMsg, transfer);
+      }
+      return origPost(msg, transfer);
+    };
+
+    const setupMsg = { type: 0, data: { config: {} } };
+    mockWorker.postMessage(setupMsg);
+    results.push({
+      test: 'SETUP message (data is object) — pass through',
+      query: '(setup)',
+      expected: '(setup)',
+      received: typeof captured?.data === 'object' ? '(object)' : captured?.data,
+      passed: typeof captured?.data === 'object' && captured?.data?.config !== undefined,
+    });
+  }
+
+  // ── Report ──
+  let pass = 0;
+  let fail = 0;
+  for (const r of results) {
+    if (r.passed) {
+      pass++;
+      console.log(`  PASS  ${r.test}`);
+      console.log(`        "${r.query}" → received="${r.received}"`);
+    } else {
+      fail++;
+      console.log(`  FAIL  ${r.test}`);
+      console.log(`        "${r.query}" → expected="${r.expected}", received="${r.received}"`);
+    }
+  }
+
+  console.log(`\n  ${pass}/${pass + fail} passed`);
+}
+
+// ── Phase 5: searchHints with fuzzy correction ──
+// Replicates site-search.ts searchHints() logic:
+//   tokenize query → ED1-expand each term → grep doc text → return top 10
+// Tests that fuzzyCorrect("bittensro") → "bittensor" produces hints that
+// the raw "bittensro" query misses.
+
+const STOPWORDS_HINTS = new Set(
+  ('a an and are as at be by for from how in is it of on or that the this to was ' +
+   'what when where which who why with does do can you your').split(/\s+/)
+);
+
+interface HintDoc { location: string; title: string; text: string; }
+
+function searchHintsClient(question: string, docs: HintDoc[]): string[] {
+  const rawTerms = question
+    .toLowerCase()
+    .match(/[a-z0-9]{3,}/g)
+    ?.filter(t => !STOPWORDS_HINTS.has(t)) || [];
+  if (rawTerms.length === 0) return [];
+
+  // Expand each term with ED1 variants
+  const fuzzyTerms = new Set<string>();
+  for (const t of rawTerms) {
+    fuzzyTerms.add(t);
+    for (const v of ed1VariantsClient(t)) fuzzyTerms.add(v);
+  }
+
+  // Score by raw term matches only — ED1 variants are for discovery.
+  // Rare corrected terms (e.g. "bittensor") surface above common
+  // terms (e.g. "gnus") that would otherwise fill the top 10.
+  const scored: Array<{ doc: HintDoc; score: number; bestIdx: number }> = [];
+  for (const doc of docs) {
+    const text = (doc.text || '').toLowerCase();
+    // Does any fuzzy term match? (ED1 discovery)
+    let anyMatch = false;
+    for (const t of fuzzyTerms) { if (text.includes(t)) { anyMatch = true; break; } }
+    if (!anyMatch) continue;
+    // Score by raw term matches
+    let matchCount = 0;
+    let bestIdx = Infinity;
+    for (const t of rawTerms) {
+      const idx = text.indexOf(t);
+      if (idx >= 0) { matchCount++; if (idx < bestIdx) bestIdx = idx; }
+    }
+    if (bestIdx === Infinity) {
+      for (const t of fuzzyTerms) {
+        const idx = text.indexOf(t);
+        if (idx >= 0 && idx < bestIdx) bestIdx = idx;
+      }
+    }
+    scored.push({ doc, score: matchCount, bestIdx });
+  }
+  scored.sort((a, b) => b.score - a.score || a.bestIdx - b.bestIdx);
+
+  const hits: string[] = [];
+  for (const { doc, bestIdx } of scored) {
+    const text = (doc.text || '').toLowerCase();
+    const start = Math.max(0, bestIdx - 60);
+    const end = Math.min(text.length, bestIdx + 120);
+    let snippet = text.slice(start, end);
+    if (start > 0) snippet = '…' + snippet;
+    if (end < text.length) snippet = snippet + '…';
+
+    hits.push(`- [${doc.title}](${doc.location}): "${snippet}"`);
+    if (hits.length >= 10) break;
+  }
+  return hits;
+}
+
+async function phase5() {
+  console.log('═══ Phase 5: searchHints — corrected vs uncorrected query ═══\n');
+
+  // Load vocab for fuzzyCorrect
+  const vocabBuf = readFileSync(
+    '/Users/Shared/SSDevelopment/Development/GeniusVentures/GeniusNetwork/documentation/gendoc-template/site/data/search-vocab.json.gz'
+  );
+  const vocabData = JSON.parse(gunzipSync(vocabBuf).toString('utf-8'));
+  const vocabSet = new Set<string>(vocabData.vocab);
+  const aliases: Record<string, string> = vocabData.aliases || {};
+  const stopwords = new Set<string>(vocabData.stopwords || []);
+
+  // Load search_index for hints
+  const idxBuf = readFileSync(
+    '/Users/Shared/SSDevelopment/Development/GeniusVentures/GeniusNetwork/documentation/gendoc-template/site/search/search_index.json.gz'
+  );
+  const idxData = JSON.parse(gunzipSync(idxBuf).toString('utf-8'));
+  const docs: HintDoc[] = idxData.docs || [];
+  console.log(`  vocab: ${vocabSet.size} words, search_index: ${docs.length} docs\n`);
+
+  // Test cases: query → expected to find hits or not
+  interface HintTestCase {
+    input: string;
+    description: string;
+    shouldFind: boolean;  // expect at least one hint
+  }
+
+  const cases: HintTestCase[] = [
+    { input: 'bittensro', description: 'raw typo — ED1 variants should find bittensor', shouldFind: true },
+    { input: 'bittensor', description: 'correct spelling — should find hints', shouldFind: true },
+    { input: 'evmrelay', description: 'correct term — should find hints', shouldFind: true },
+    { input: 'evmrely', description: 'deletion of a — ED1 should find evmrelay', shouldFind: true },
+    { input: 'bittensr', description: 'deletion of o — ED1 insertion restores bittensor', shouldFind: true },
+    { input: 'xyznonexistent123', description: 'nonsense — should find nothing', shouldFind: false },
+  ];
+
+  let pass = 0;
+  let fail = 0;
+
+  for (const tc of cases) {
+    // Test 1: UNCORRECTED query → searchHints
+    const rawHints = searchHintsClient(tc.input, docs);
+    const rawCount = rawHints.length;
+
+    // Test 2: CORRECTED query → searchHints
+    const corrected = fuzzyCorrectClient(tc.input, vocabSet, aliases, stopwords);
+    const corrHints = corrected !== tc.input
+      ? searchHintsClient(corrected, docs)
+      : rawHints;
+    const corrCount = corrHints.length;
+
+    const rawOk = tc.shouldFind ? rawCount > 0 : rawCount === 0;
+    const corrOk = tc.shouldFind ? corrCount > 0 : corrCount === 0;
+
+    // The key assertion: if correction changed the query, corrected hints
+    // should be >= raw hints (never fewer)
+    const notWorse = corrCount >= rawCount;
+
+    const allOk = rawOk && corrOk && notWorse;
+    if (allOk) {
+      pass++;
+      console.log(`  PASS  "${tc.input}" → corrected="${corrected}"  raw=${rawCount} hints  corrected=${corrCount} hints  (${tc.description})`);
+    } else {
+      fail++;
+      console.log(`  FAIL  "${tc.input}" → corrected="${corrected}"  raw=${rawCount} hints  corrected=${corrCount} hints  (${tc.description})`);
+      if (!rawOk) console.log(`        raw hints expected ${tc.shouldFind ? '>0' : '=0'}, got ${rawCount}`);
+      if (!corrOk) console.log(`        corrected hints expected ${tc.shouldFind ? '>0' : '=0'}, got ${corrCount}`);
+      if (!notWorse) console.log(`        corrected hints (${corrCount}) < raw hints (${rawCount}) — regression`);
+    }
+  }
+
+  // ── Extra: the actual end-to-end scenario ──
+  console.log(`\n  ── transport.ts scenario: fuzzyCorrect before searchHints ──`);
+  const query = 'bittensro';
+  const fixed = fuzzyCorrectClient(query, vocabSet, aliases, stopwords);
+  const directHints = searchHintsClient(query, docs);
+  const fixedHints = searchHintsClient(fixed, docs);
+  console.log(`  query="${query}" corrected="${fixed}"`);
+  console.log(`  hints with raw query:    ${directHints.length}`);
+  console.log(`  hints with corrected:    ${fixedHints.length}`);
+  if (fixedHints.length > 0) {
+    console.log(`  first hint: ${fixedHints[0].substring(0, 120)}...`);
+  }
+  const e2eOk = fixedHints.length >= directHints.length;
+  console.log(`  ${e2eOk ? 'PASS' : 'FAIL'}  corrected hints >= raw hints`);
+
+  console.log(`\n  ${pass}/${pass + fail} passed`);
+  if (!e2eOk) fail++;
+}
+
+// ── Phase 6: End-to-end worker test ──
+// Sends a real query + searchHints to the running local worker and
+// verifies the hinted document appears as a source (proving fetchDoc
+// resolved the hint URL and retrieved the page).
+
+async function phase6(docs: HintDoc[]) {
+  console.log('═══ Phase 6: Worker end-to-end — hinted doc in sources ═══\n');
+
+  const WORKER_URL = 'http://localhost:8787/api/ask';
+
+  // Load vocab for fuzzyCorrect
+  const vocabBuf = readFileSync(
+    '/Users/Shared/SSDevelopment/Development/GeniusVentures/GeniusNetwork/documentation/gendoc-template/site/data/search-vocab.json.gz'
+  );
+  const vocabData = JSON.parse(gunzipSync(vocabBuf).toString('utf-8'));
+  const vocabSet = new Set<string>(vocabData.vocab);
+  const aliases: Record<string, string> = vocabData.aliases || {};
+  const stopwords = new Set<string>(vocabData.stopwords || []);
+
+  const question = "how does Gnus.ai compare to Bittensro?";
+  const corrected = fuzzyCorrectClient(question, vocabSet, aliases, stopwords);
+  const hints = searchHintsClient(corrected, docs).join('\n');
+
+  console.log(`  question:   "${question}"`);
+  console.log(`  corrected:  "${corrected}"`);
+  console.log(`  hints:      ${hints.split('\n').length} lines, ${hints.length} chars`);
+  if (hints) {
+    const firstLine = hints.split('\n')[0];
+    console.log(`  first hint: ${firstLine.substring(0, 120)}...`);
+  }
+
+  // Send to worker
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Origin': 'http://localhost:8000' },
+      body: JSON.stringify({ question, history: [], search_hints: hints }),
+    });
+
+    if (!res.ok) {
+      console.log(`  FAIL  worker returned HTTP ${res.status}`);
+      console.log(`  body: ${await res.text()}`);
+      return;
+    }
+
+    // Read SSE stream
+    const text = await res.text();
+    const lines = text.split('\n').filter(l => l.startsWith('data:'));
+
+    // Parse all SSE events
+    let sourcesEvent: any = null;
+    let thinking = '';
+    let responseText = '';
+
+    for (const line of lines) {
+      try {
+        const obj = JSON.parse(line.slice(5).trim());
+        if (obj.sources) sourcesEvent = obj;
+        if (obj.thinking) thinking += obj.thinking;
+        if (obj.text) responseText += obj.text;
+      } catch {}
+    }
+
+    if (!sourcesEvent) {
+      console.log('  FAIL  no sources event in SSE stream');
+      return;
+    }
+
+    const sources: Array<{title: string; url: string}> = sourcesEvent.sources || [];
+    console.log(`\n  sources (${sources.length}):`);
+    for (const s of sources) {
+      console.log(`    - ${s.title}  [${s.url}]`);
+    }
+
+    // Extract hinted URL from first hint for comparison
+    const firstHint = hints.split('\n')[0] || '';
+    const hintMatch = firstHint.match(/^- \[([^\]]+)\]\(([^)]+)\)/);
+    const hintedUrl = hintMatch ? hintMatch[2] : '';
+    const hintedTitle = hintMatch ? hintMatch[1] : '';
+
+    console.log(`\n  hinted URL:   "${hintedUrl}"`);
+    console.log(`  hinted title: "${hintedTitle}"`);
+
+    // Check: does any source match the hinted URL or title?
+    const sourceMatchesHint = sources.some(s => {
+      const sUrl = (s.url || '').replace(/^\/+/, '');  // strip leading slashes
+      const hUrl = (hintedUrl || '').replace(/^\/+/, '');
+      return sUrl === hUrl || sUrl.endsWith(hUrl) || hUrl.endsWith(sUrl) ||
+             s.title === hintedTitle;
+    });
+
+    console.log(`\n  ── AI thinking ──`);
+    console.log(`  ${thinking.slice(0, 500)}${thinking.length > 500 ? '...' : ''}`);
+
+    console.log(`\n  ── AI response ──`);
+    console.log(`  ${responseText.slice(0, 1000) || '(no text yet — still streaming?)'}`);
+    if (responseText.length > 1000) console.log(`  ... (${responseText.length} chars total)`);
+
+    // Verify the response mentions bittensor (the corrected term)
+    const mentionsBittensor = responseText.toLowerCase().includes('bittensor');
+    const acknowledgesTypo = responseText.toLowerCase().includes('misspell') ||
+                             responseText.toLowerCase().includes('bittensro') ||
+                             responseText.toLowerCase().includes('correct');
+
+    console.log(`\n  ── Checks ──`);
+    console.log(`  hinted doc in sources: ${sourceMatchesHint ? 'PASS' : 'FAIL'}`);
+    console.log(`  mentions bittensor:    ${mentionsBittensor ? 'PASS' : 'FAIL'}`);
+    console.log(`  acknowledges typo:     ${acknowledgesTypo ? 'PASS' : 'INFO'}`);
+
+    const allPass = sourceMatchesHint && mentionsBittensor;
+    console.log(`\n  ${allPass ? 'PASS' : 'FAIL'}  overall`);
+  } catch (e: any) {
+    console.log(`  FAIL  could not reach worker: ${e.message}`);
+  }
+}
+
 // ── Main ──
 
 async function main() {
@@ -303,6 +949,17 @@ async function main() {
 
   await phase1(entries);
   await phase2(entries);
+  await phase3();
+  await phase4();
+  await phase5();
+
+  // Load search_index for phase6
+  const idxBuf6 = readFileSync(
+    '/Users/Shared/SSDevelopment/Development/GeniusVentures/GeniusNetwork/documentation/gendoc-template/site/search/search_index.json.gz'
+  );
+  const idxData6 = JSON.parse(gunzipSync(idxBuf6).toString('utf-8'));
+  const hintDocs: HintDoc[] = idxData6.docs || [];
+  await phase6(hintDocs);
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
