@@ -49,7 +49,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ── Read configuration from gendoc.yml ──────────────────────────────────────────
-IFS=$'\n' read -r -d '' PROJECT_NAME DEPLOY_BRANCH <<< "$(python3 -c "
+mapfile -t GENDOC_VARS <<< "$(python3 -c "
 import yaml, sys
 with open(sys.argv[1], 'r') as f:
     cfg = yaml.safe_load(f)
@@ -58,6 +58,8 @@ branch = cfg.get('deploy', {}).get('cloudflare', {}).get('branch', 'production')
 print(name)
 print(branch)
 " "$GENDOC_YML")"
+PROJECT_NAME="${GENDOC_VARS[0]}"
+DEPLOY_BRANCH="${GENDOC_VARS[1]}"
 
 # CLI --branch flag overrides gendoc.yml
 DEPLOY_BRANCH="${CLI_BRANCH:-$DEPLOY_BRANCH}"
