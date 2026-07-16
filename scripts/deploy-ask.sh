@@ -42,7 +42,7 @@ source "$TEMPLATE_ROOT/../.generated-vars"
 echo "==> Deploying ask worker '$WORKER_NAME'"
 if [ "$USE_TOKEN_AUTH" = true ]; then
   DEPLOY_OUTPUT=$(cd "$TEMPLATE_ROOT/ask-ai" && CLOUDFLARE_API_TOKEN="$CF_API_TOKEN" CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT_ID" \
-    wrangler deploy --config "$GENERATED" 2>&1)
+    wrangler deploy --config "$GENERATED" --branch main 2>&1)
 else
   DEPLOY_OUTPUT=$(cd "$TEMPLATE_ROOT/ask-ai" && wrangler deploy --config "$GENERATED" 2>&1)
 fi
