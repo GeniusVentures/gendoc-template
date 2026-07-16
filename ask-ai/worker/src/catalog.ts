@@ -12,7 +12,7 @@ export async function loadCatalog(env: Env, origin: string): Promise<CatalogEntr
 
   let llmsUrl = env.LLMS_URL;
   if (!llmsUrl) {
-    llmsUrl = `${origin}/llms-full.txt`;
+    llmsUrl = `${origin}/llms.txt`;
   } else if (llmsUrl.startsWith('/')) {
     llmsUrl = new URL(llmsUrl, origin).href;
   }
