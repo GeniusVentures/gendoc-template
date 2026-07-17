@@ -195,7 +195,6 @@ export async function extractTerms(env: Env, question: string, origin: string): 
 
     if (hits.length === 1) {
       // Single unambiguous correction
-      console.log(`[ask] spell correct: "${lower}" → "${hits[0]}"`);
       corrections[lower] = hits[0];
       corrected.push(hits[0]);
     } else {

@@ -167,8 +167,6 @@ export default {
     const { terms, corrections, unmatched } = await extractTerms(env, question, origin);
     let top = scoreEntries(entries, terms).slice(0, 30);
 
-    console.log(`[ask] catalog: ${entries.length}, top: ${top.length}, unmatched: [${unmatched.join(',')}], corrections: ${JSON.stringify(corrections)}, searchHints: ${searchHints.length} chars, q: "${question.slice(0, 80)}"`);
-
     const sse = new TransformStream();
     const writer = sse.writable.getWriter();
     const send = (obj: SSEMessage) => writer.write(enc(`data: ${JSON.stringify(obj)}\n\n`));
@@ -181,7 +179,6 @@ export default {
       // can accidentally match wrong entries, and fuzzy (ED1+Levenshtein)
       // typically finds the correct ones.
       const fuzzy = fuzzyScoreEntries(entries, unmatched).slice(0, 15);
-      console.log(`[ask] fuzzy fallback: ${fuzzy.length} entries for [${unmatched.join(', ')}]`);
       if (fuzzy.length > 0) {
         // Merge: fuzzy matches first (they're better for misspellings),
         // then scoreEntries results, deduplicated by URL.

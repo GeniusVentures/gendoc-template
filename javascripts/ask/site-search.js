@@ -71,8 +71,16 @@ export async function searchHints(question) {
     // ED1 variants are only for discovery — raw term count ranks docs so
     // rare corrected terms (e.g. "bittensor") surface above common ones
     // (e.g. "gnus") that match thousands of docs.
+    const yieldTick = () => new Promise(r => setTimeout(r, 0));
+    // Process in chunks so the main thread isn't blocked.
+    const kChunkSize = 2000;
     const scored = [];
-    for (const doc of docs) {
+    for (let i = 0; i < docs.length; i += kChunkSize) {
+        if (i > 0)
+            await yieldTick();
+        const chunkEnd = Math.min(i + kChunkSize, docs.length);
+        for (let j = i; j < chunkEnd; j++) {
+            const doc = docs[j];
         const text = (doc.text || '').toLowerCase();
         const titleLower = (doc.title || '').toLowerCase();
         // Check both text and title for matches — some pages (like
@@ -113,7 +121,8 @@ export async function searchHints(question) {
             }
         }
         scored.push({ doc, score: matchCount, bestIdx });
-    }
+        }  // inner loop (docs in chunk)
+    }    // outer loop (chunks)
     // Sort by score desc, then by index (earlier match wins tie)
     scored.sort((a, b) => b.score - a.score || a.bestIdx - b.bestIdx);
     const hits = [];

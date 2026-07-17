@@ -80,12 +80,23 @@ export async function searchHints(question: string): Promise<string> {
   const docs = await loadDocs();
   if (docs.length === 0) return '';
 
+  // Yield to the event loop so the browser stays responsive.
+  const yieldTick = () => new Promise<void>(r => setTimeout(r, 0));
+
   // Score every matching doc by how many raw query terms it matches.
   // ED1 variants are only for discovery — raw term count ranks docs so
   // rare corrected terms (e.g. "bittensor") surface above common ones
   // (e.g. "gnus") that match thousands of docs.
+  //
+  // Process in chunks so the main thread isn't blocked for seconds
+  // while iterating 18k+ docs with ED1 expansion.
+  const kChunkSize = 2000;
   const scored: Array<{ doc: SearchDoc; score: number; bestIdx: number }> = [];
-  for (const doc of docs) {
+  for (let i = 0; i < docs.length; i += kChunkSize) {
+    if (i > 0) await yieldTick();
+    const chunkEnd = Math.min(i + kChunkSize, docs.length);
+    for (let j = i; j < chunkEnd; j++) {
+      const doc = docs[j];
     const text = (doc.text || '').toLowerCase();
     const titleLower = (doc.title || '').toLowerCase();
     // Check both text and title for matches — some pages (like
@@ -119,9 +130,8 @@ export async function searchHints(question: string): Promise<string> {
       }
     }
     scored.push({ doc, score: matchCount, bestIdx });
-  }
-
-  // Sort by score desc, then by index (earlier match wins tie)
+    }  // inner loop (docs in chunk)
+  }    // outer loop (chunks)
   scored.sort((a, b) => b.score - a.score || a.bestIdx - b.bestIdx);
 
   const hits: string[] = [];

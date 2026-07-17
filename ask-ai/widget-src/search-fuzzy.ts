@@ -89,9 +89,6 @@ const PrevWorker = (window as any).Worker as typeof Worker;
     worker.postMessage = function (msg: any, transfer?: any) {
       if (msg && typeof msg === 'object' && typeof msg.data === 'string') {
         const corrected = fuzzyCorrect(msg.data as string);
-        if (corrected !== msg.data) {
-          console.log(`[search-fuzzy] "${msg.data}" → "${corrected}"`);
-        }
         const newMsg: Record<string, unknown> = {};
         for (const k in msg) { if (Object.prototype.hasOwnProperty.call(msg, k)) newMsg[k] = msg[k]; }
         newMsg.data = corrected;

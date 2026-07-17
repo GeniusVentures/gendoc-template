@@ -92,9 +92,6 @@ window.Worker = function (scriptURL, options) {
         worker.postMessage = function (msg, transfer) {
             if (msg && typeof msg === 'object' && typeof msg.data === 'string') {
                 const corrected = fuzzyCorrect(msg.data);
-                if (corrected !== msg.data) {
-                    console.log(`[search-fuzzy] "${msg.data}" → "${corrected}"`);
-                }
                 const newMsg = {};
                 for (const k in msg) {
                     if (Object.prototype.hasOwnProperty.call(msg, k))
