@@ -279,7 +279,6 @@ export default {
           (correctedTermList.length > 0
             ? `${next()}Do not say ${correctedTermList.join(' or ')} is absent unless it is absent from the material below.\n`
             : '') +
-          `${next()}When listing items, number them sequentially (1, 2, 3...), never repeat the same number.\n` +
           `\nOUTPUT REQUIREMENTS\n` +
           `${next()}Begin with a direct answer to the user's question.\n` +
           `${next()}Preserve all relevant names, facts, figures, comparisons, qualifications, and examples found in the provided material. Do not omit relevant details merely to make the answer shorter.\n` +

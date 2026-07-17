@@ -97,6 +97,7 @@ class LocalPromptTransport implements AskTransport {
 
   async *ask(question: string, _history: readonly ChatTurn[], signal?: AbortSignal): AsyncGenerator<SseEvent> {
     yield { sources: [] };
+    if (signal?.aborted) return;
     if ((await LanguageModel.availability()) === "unavailable") {
       yield { text: "On-device AI isn't available in this browser." };
       yield { done: true };
@@ -116,9 +117,10 @@ class LocalPromptTransport implements AskTransport {
     try {
       const stream = session.promptStreaming(`Context:\n${context}\n\nQuestion: ${question}`);
       for await (const chunk of stream) {
+        if (signal?.aborted) break;
         yield { text: chunk };
       }
-      yield { done: true };
+      if (!signal?.aborted) yield { done: true };
     } finally {
       session.destroy();
     }
