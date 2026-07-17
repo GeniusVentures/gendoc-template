@@ -104,7 +104,10 @@ export const DRAWER_CSS = `
     font-family: ui-monospace, Menlo, monospace; font-size: 12px;
   }
   .message.assistant a { color: var(--ask-accent, #2f6fed); }
-  .message.assistant h1, .message.assistant h2, .message.assistant h3, .message.assistant h4 { margin: 8px 0 4px; font-weight: 600; line-height: 1.3; }
+  .message.assistant h1, .message.assistant h2, .message.assistant h3, .message.assistant h4 {
+    margin: var(--ask-heading-margin, 10px 0 6px);
+    font-weight: 600; line-height: 1.3;
+  }
   .message.assistant h1 { font-size: 16px; }
   .message.assistant h2 { font-size: 15px; }
   .message.assistant h3 { font-size: 14px; }
@@ -116,22 +119,22 @@ export const DRAWER_CSS = `
   .message.assistant .body > :first-child { margin-top: 0; }
   .message.assistant .body > :last-child { margin-bottom: 0; }
   .message.assistant ul, .message.assistant ol {
-    margin: var(--ask-list-margin, 4px 0);
+    margin: var(--ask-list-margin, 6px 0 10px);
   }
   .message.assistant ul { padding-left: var(--ask-list-padding, 20px); }
   .message.assistant ol { padding-left: var(--ask-ordered-list-padding, 26px); }
   .message.assistant li { margin: var(--ask-list-item-margin, 2px 0); }
-  .message.assistant p { margin: var(--ask-paragraph-margin, 4px 0); }
+  .message.assistant p { margin: var(--ask-paragraph-margin, 0 0 8px); }
   .message.assistant li > p { margin: var(--ask-list-paragraph-margin, 0); }
   .message.assistant table {
     display: block; max-width: 100%; width: 100%; overflow-x: auto;
-    border-collapse: collapse; margin: 6px 0; font-size: 12px;
+    border-collapse: collapse; margin: var(--ask-table-margin, 8px 0 10px); font-size: 12px;
   }
   .message.assistant th, .message.assistant td { border: 1px solid var(--ask-drawer-border, #d6dde3); padding: 4px 8px; text-align: left; }
   .message.assistant th { background: var(--ask-code-bg, #e6ebf1); font-weight: 600; }
   .message.assistant tr:nth-child(even) td { background: var(--ask-msg-bg, #f1f4f7); }
   .message.assistant pre {
-    max-width: 100%; margin: 6px 0; padding: 8px 10px;
+    max-width: 100%; margin: var(--ask-code-block-margin, 8px 0 10px); padding: 8px 10px;
     background: var(--ask-code-bg, #e6ebf1); border-radius: 4px;
     overflow-x: auto; font-size: 12px;
   }
