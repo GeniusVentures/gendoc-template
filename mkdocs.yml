@@ -98,6 +98,7 @@ extra_javascript:
   - /javascripts/breadcrumbs.js
   - https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js
   - https://cdn.jsdelivr.net/npm/marked/marked.min.js
+  - https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js
   - path: /javascripts/ask/main.js
     type: module
 

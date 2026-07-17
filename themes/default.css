@@ -676,6 +676,17 @@ body, .md-typeset, .md-header, .md-nav, .md-search__input, .md-tabs {
   --ask-msg-bg: #f8fafc;
   --ask-msg-border: #e5e7eb;
   --ask-code-bg: #f1f5f9;
+  --ask-code-fg: #1e293b;
+  --ask-code-comment: #64748b;
+  --ask-code-keyword: #7c3aed;
+  --ask-code-string: #047857;
+  --ask-code-number: #b45309;
+  --ask-code-title: #1d4ed8;
+  --ask-code-attribute: #be123c;
+  --ask-code-meta: #0369a1;
+  --ask-code-built-in: #0f766e;
+  --ask-code-addition: #047857;
+  --ask-code-deletion: #b91c1c;
   --ask-input-bg: #fff;
   --ask-input-border: #e5e7eb;
   --ask-thinking-bg: #f8fafc;
@@ -696,4 +707,15 @@ body, .md-typeset, .md-header, .md-nav, .md-search__input, .md-tabs {
   --ask-dark-muted-fg: #94a3b8;
   --ask-dark-thinking-fg: #a0b0c0;
   --ask-dark-link: #6fa8f0;
+  --ask-dark-code-fg: #e2e8f0;
+  --ask-dark-code-comment: #94a3b8;
+  --ask-dark-code-keyword: #c4b5fd;
+  --ask-dark-code-string: #86efac;
+  --ask-dark-code-number: #f0abfc;
+  --ask-dark-code-title: #7dd3fc;
+  --ask-dark-code-attribute: #fcd34d;
+  --ask-dark-code-meta: #f472b6;
+  --ask-dark-code-built-in: #93c5fd;
+  --ask-dark-code-addition: #86efac;
+  --ask-dark-code-deletion: #fca5a5;
 }

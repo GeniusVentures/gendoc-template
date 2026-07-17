@@ -475,6 +475,7 @@ export class DrawerUI
         providerEl.remove();
       }
       body.innerHTML = renderMarkdown(message.text || "…");
+      highlightCodeBlocks(body);
     }
 
     element.querySelector(".sources")?.remove();
@@ -537,6 +538,27 @@ function buildSourceList(sources: readonly { title: string; url: string }[]): HT
     details.appendChild(anchor);
   }
   return details;
+}
+
+/** Highlight sanitized code blocks when Highlight.js is available. */
+function highlightCodeBlocks(container: HTMLElement): void
+{
+  const highlighter = (window as any).hljs;
+  if (!highlighter || typeof highlighter.highlightElement !== "function")
+  {
+    return;
+  }
+  container.querySelectorAll<HTMLElement>("pre code").forEach((code) =>
+  {
+    try
+    {
+      highlighter.highlightElement(code);
+    }
+    catch
+    {
+      /* Unknown language or malformed block: leave the sanitized code plain. */
+    }
+  });
 }
 
 /** Render markdown to HTML using the marked library (loaded via CDN in mkdocs.yml). */

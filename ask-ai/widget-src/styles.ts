@@ -136,6 +136,39 @@ export const DRAWER_CSS = `
     overflow-x: auto; font-size: 12px;
   }
   .message.assistant pre code { background: none; padding: 0; }
+  .message.assistant .hljs { color: var(--ask-code-fg, #1e293b); }
+  .message.assistant .hljs-comment,
+  .message.assistant .hljs-quote { color: var(--ask-code-comment, #64748b); font-style: italic; }
+  .message.assistant .hljs-keyword,
+  .message.assistant .hljs-selector-tag,
+  .message.assistant .hljs-subst { color: var(--ask-code-keyword, #7c3aed); }
+  .message.assistant .hljs-string,
+  .message.assistant .hljs-doctag,
+  .message.assistant .hljs-regexp { color: var(--ask-code-string, #047857); }
+  .message.assistant .hljs-number,
+  .message.assistant .hljs-literal,
+  .message.assistant .hljs-variable,
+  .message.assistant .hljs-template-variable { color: var(--ask-code-number, #b45309); }
+  .message.assistant .hljs-title,
+  .message.assistant .hljs-section,
+  .message.assistant .hljs-selector-id,
+  .message.assistant .hljs-selector-class,
+  .message.assistant .hljs-type { color: var(--ask-code-title, #1d4ed8); font-weight: 600; }
+  .message.assistant .hljs-attribute,
+  .message.assistant .hljs-attr,
+  .message.assistant .hljs-tag,
+  .message.assistant .hljs-name { color: var(--ask-code-attribute, #be123c); }
+  .message.assistant .hljs-meta,
+  .message.assistant .hljs-meta .hljs-keyword { color: var(--ask-code-meta, #0369a1); }
+  .message.assistant .hljs-built_in,
+  .message.assistant .hljs-builtin-name,
+  .message.assistant .hljs-symbol,
+  .message.assistant .hljs-bullet,
+  .message.assistant .hljs-link { color: var(--ask-code-built-in, #0f766e); }
+  .message.assistant .hljs-addition { color: var(--ask-code-addition, #047857); }
+  .message.assistant .hljs-deletion { color: var(--ask-code-deletion, #b91c1c); }
+  .message.assistant .hljs-emphasis { font-style: italic; }
+  .message.assistant .hljs-strong { font-weight: 700; }
   .message.assistant blockquote { margin: 6px 0; padding: 4px 10px; border-left: 3px solid var(--ask-accent, #2f6fed); color: var(--ask-muted-fg, #6b7b8b); }
   .message.assistant hr { border: 0; border-top: 1px solid var(--ask-drawer-border, #d6dde3); margin: 8px 0; }
 
@@ -213,6 +246,17 @@ export const DRAWER_CSS = `
     --ask-session-active: var(--ask-dark-session-item-border, #1e2732);
     --ask-session-hover: var(--ask-dark-session-item-border, #1e2732);
     --ask-muted-fg: var(--ask-dark-muted-fg, #8fa1b0);
+    --ask-code-fg: var(--ask-dark-code-fg, #e2e8f0);
+    --ask-code-comment: var(--ask-dark-code-comment, #94a3b8);
+    --ask-code-keyword: var(--ask-dark-code-keyword, #c4b5fd);
+    --ask-code-string: var(--ask-dark-code-string, #86efac);
+    --ask-code-number: var(--ask-dark-code-number, #f0abfc);
+    --ask-code-title: var(--ask-dark-code-title, #7dd3fc);
+    --ask-code-attribute: var(--ask-dark-code-attribute, #fcd34d);
+    --ask-code-meta: var(--ask-dark-code-meta, #f472b6);
+    --ask-code-built-in: var(--ask-dark-code-built-in, #93c5fd);
+    --ask-code-addition: var(--ask-dark-code-addition, #86efac);
+    --ask-code-deletion: var(--ask-dark-code-deletion, #fca5a5);
   }
   .drawer[data-theme="dark"] .thinking pre { color: var(--ask-dark-thinking-fg, #a0b0c0); }
   .drawer[data-theme="dark"] .sources a { color: var(--ask-dark-link, #6fa8f0); }
