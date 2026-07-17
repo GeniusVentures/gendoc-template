@@ -1,76 +1,17 @@
-name: Deploy Docs to Cloudflare Pages
+name: Deploy documentation
 
 on:
   push:
     branches: [main]
-
-  # Allow manual dispatch from GitHub Actions UI
   workflow_dispatch:
 
-# Only one deploy at a time per branch
-concurrency:
-  group: pages-deploy-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-      # ── Checkout ──────────────────────────────────────────────────────────
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
-
-      # ── Python ────────────────────────────────────────────────────────────
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install Python dependencies
-        run: pip install -r gendoc-template/requirements.txt
-
-      # ── System dependencies ───────────────────────────────────────────────
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq doxygen
-
-      # ── doxybook2 ─────────────────────────────────────────────────────────
-      - name: Install doxybook2
-        run: bash gendoc-template/scripts/install-deps.sh
-
-      # ── Generate wrangler.toml ────────────────────────────────────────────
-      - name: Generate wrangler.toml
-        run: |
-          python3 -c "
-          import yaml
-          with open('gendoc.yml', 'r') as f:
-              cfg = yaml.safe_load(f)
-          project  = cfg['deploy']['cloudflare']['pages_project_name']
-          date     = cfg['deploy']['cloudflare'].get('compatibility_date', '2024-01-01')
-          site_dir = cfg.get('mkdocs', {}).get('site_dir', 'site')
-          tpl = open('gendoc-template/wrangler.toml.template', 'r').read()
-          out = tpl.replace('{{PAGES_PROJECT_NAME}}', project)
-          out = out.replace('{{COMPATIBILITY_DATE}}', date)
-          out = out.replace('{{SITE_DIR}}', site_dir)
-          with open('gendoc-template/wrangler.toml', 'w') as f:
-              f.write(out)
-          print(f'wrangler.toml generated — project={project}  site_dir={site_dir}')
-          "
-
-      # ── Build ─────────────────────────────────────────────────────────────
-      - name: Build documentation site
-        run: bash gendoc-template/scripts/build.sh
-
-      # ── Deploy ────────────────────────────────────────────────────────────
-      - name: Deploy to Cloudflare Pages
-        run: |
-          cd gendoc-template
-          npx wrangler pages deploy
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  deploy:
+    # This reusable workflow deploys the Ask AI Worker first when enabled,
+    # then builds and deploys the static documentation site to Cloudflare Pages.
+    uses: GeniusVentures/gendoc-template/.github/workflows/deploy.yml@develop
+    with:
+      template-path: gendoc-template
+    secrets:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
