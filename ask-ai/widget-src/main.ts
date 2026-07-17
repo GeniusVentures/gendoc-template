@@ -40,13 +40,16 @@ async function main(): Promise<void>
     busy = true;
     drawer.setBusy(true);
 
+    const controller = new AbortController();
+    drawer.setOnStop(() => controller.abort());
+
     const history = transcript.history();
     transcript.addUser(question);
     const answerIndex = transcript.beginAssistant();
 
     try
     {
-      for await (const event of transport.ask(question, history))
+      for await (const event of transport.ask(question, history, controller.signal))
       {
         if (event.sources !== undefined)
         {
@@ -77,6 +80,7 @@ async function main(): Promise<void>
     }
     finally
     {
+      drawer.setOnStop(null);
       busy = false;
       drawer.setBusy(false);
     }

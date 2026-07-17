@@ -35,6 +35,21 @@ function editDist(a: string, b: string): number {
   return prev[n];
 }
 
+/** Return a window of `text` centered around the first occurrence of any `terms`, up to `cap` chars. */
+function windowSlice(text: string, terms: string[], cap: number): string {
+  if (text.length <= cap) return text;
+  let best = -1;
+  const lower = text.toLowerCase();
+  for (const t of terms) {
+    const idx = lower.indexOf(t.toLowerCase());
+    if (idx >= 0 && (best < 0 || idx < best)) best = idx;
+  }
+  if (best < 0) return text.slice(0, cap);
+  const half = Math.floor(cap / 2);
+  const start = Math.max(0, best - half);
+  return text.slice(start, start + cap);
+}
+
 /**
  * Build fallback context when the normalizer couldn't match a word.
  * Tier 1: ED1 variant generation + title-word Set lookup (fast, O(1000) per word).
@@ -191,7 +206,11 @@ export default {
     // match the CORRECTED term — common words like "gnus" can match 20+
     // entries and drown out the hints that actually answer the question.
     // Corrected-term matches pass through uncapped.
-    if (searchHints) {
+    // When we have spelling corrections, prioritize corrected-term matches
+    // over entries that matched only common/uncorrected terms.  Without
+    // corrections every entry is "fromOther" and the cap would throw away
+    // most results — so only gate when corrections actually exist.
+    if (searchHints && Object.keys(corrections).length > 0) {
       const correctedTerms = Object.values(corrections) as string[];
       const fromCorrected = top.filter(e =>
         correctedTerms.some(t => e.title.toLowerCase().includes(t))
@@ -224,7 +243,7 @@ export default {
                 { title: hintedTitle, url: hintedUrl, desc: '' }, env, origin
               );
               if (doc && doc.text) {
-                const slice = doc.text.slice(0, DOC_CHAR_CAP);
+                const slice = windowSlice(doc.text, terms, DOC_CHAR_CAP);
                 if (slice.length >= 200) {
                   primaryContext =
                     `\n--- source: ${hintedUrl}\ntitle: ${hintedTitle}\n---\n${slice}`;
@@ -245,14 +264,6 @@ export default {
             `Compare or answer about: ${correctedTermList.join(', ')}\n`;
         }
 
-        // Count unique hint pages (strip hash fragments to get page-level URLs).
-        const hintPages = searchHints
-          ? new Set(searchHints.split('\n')
-              .map(l => l.match(/\(([^)]+)\)/)?.[1]?.replace(/#.*$/, ''))
-              .filter(Boolean))
-          : new Set<string>();
-        const isAmbiguous = hintPages.size >= 3;
-
         let instrNum = 0;
         const next = () => `${++instrNum}. `;
         const answerInstruction =
@@ -268,10 +279,17 @@ export default {
           (correctedTermList.length > 0
             ? `${next()}Do not say ${correctedTermList.join(' or ')} is absent unless it is absent from the material below.\n`
             : '') +
-          (isAmbiguous
-            ? `${next()}The question is vague — multiple pages match. List each matching page below as a numbered list (1, 2, 3...) and ASK the user which they meant. Do NOT pick one arbitrarily.\n`
-            : '') +
-          `${next()}When listing items, number them sequentially (1, 2, 3...), never repeat the same number.\n`;
+          `${next()}When listing items, number them sequentially (1, 2, 3...), never repeat the same number.\n` +
+          `\nOUTPUT REQUIREMENTS\n` +
+          `${next()}Begin with a direct answer to the user's question.\n` +
+          `${next()}Preserve all relevant names, facts, figures, comparisons, qualifications, and examples found in the provided material. Do not omit relevant details merely to make the answer shorter.\n` +
+          `${next()}Organize substantial answers with descriptive Markdown headings using ## or ###.\n` +
+          `${next()}Place a blank line after every heading.\n` +
+          `${next()}Use bullet lists for related facts. Use numbered lists only for sequences, rankings, or choices that the user must select from.\n` +
+          `${next()}Explain each list item with enough context to be understandable; do not output fragments or labels without explanations.\n` +
+          `${next()}Use short paragraphs and Markdown tables when comparing several items with the same attributes.\n` +
+          `${next()}Do not add sections merely for decoration. Short answers do not require headings.\n` +
+          `${next()}Before finishing, silently verify that every relevant detail from the primary material has been represented accurately.\n`;
 
         let system: string;
         if (primaryContext) {
@@ -300,7 +318,8 @@ export default {
             `They may be misspelled. Below is a directory of available documentation topics.\n` +
             `Based on the user's question and the topic names below, suggest what they\n` +
             `might have meant and point them to the relevant topic(s).\n\n` +
-            `AVAILABLE TOPICS:\n${catalogOverview}`;
+            `AVAILABLE TOPICS:\n${catalogOverview}\n\n` +
+            `FORMAT: Present your suggestions as a bullet list. For each topic include its name and why it may be relevant. Use ## headings only if you have 3+ suggestions.`;
         }
 
 
@@ -330,6 +349,8 @@ export default {
           const reader = upstream.res.body!.getReader();
           const dec = new TextDecoder();
           let buf = '';
+          let fullText = '';
+          let runaway = false;
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -344,8 +365,17 @@ export default {
               let chunk: any;
               try { chunk = JSON.parse(payload); } catch { continue; }
               const content = chunk.choices?.[0]?.delta?.content;
-              if (content) await send({ text: content });
+              if (content) {
+                fullText += content;
+                await send({ text: content });
+                if (fullText.length > 100 && /(\\|\/){20,}/.test(fullText.slice(-60))) {
+                  await send({ text: '\n\n[response truncated — model error]' });
+                  runaway = true;
+                  break;
+                }
+              }
             }
+            if (runaway) { reader.cancel(); }
           }
           break;
         }
@@ -412,7 +442,7 @@ export default {
         // Build primary context (own budget)
         let primaryContext = '';
         if (primaryDoc && primaryDoc.text) {
-          const slice = primaryDoc.text.slice(0, DOC_CHAR_CAP);
+          const slice = windowSlice(primaryDoc.text, terms, DOC_CHAR_CAP);
           if (slice.length >= 200) {
             primaryContext =
               `\n--- source: ${primaryDoc.url}\ntitle: ${primaryDoc.title}\n---\n${slice}`;
@@ -423,7 +453,8 @@ export default {
         let suppContext = '';
         let used = 0;
         for (const d of supportingDocs) {
-          const slice = d.text.slice(0, Math.min(DOC_CHAR_CAP, TOTAL_CHAR_CAP - used));
+          const cap = Math.min(DOC_CHAR_CAP, TOTAL_CHAR_CAP - used);
+          const slice = windowSlice(d.text, terms, cap);
           if (slice.length < 200) continue;
           suppContext += `\n\n--- source: ${d.url}\ntitle: ${d.title}\n---\n${slice}`;
           used += slice.length;
@@ -446,38 +477,29 @@ export default {
             `Use the documents below to find the closest match.\n`;
         }
 
-        // Count unique hint pages (strip hash fragments to get page-level URLs).
-        const hintPages2 = searchHints
-          ? new Set(searchHints.split('\n')
-              .map(l => l.match(/\(([^)]+)\)/)?.[1]?.replace(/#.*$/, ''))
-              .filter(Boolean))
-          : new Set<string>();
-        const isAmbiguous2 = hintPages2.size >= 3;
+        const reasoningInstruction =
+          `\nREASONING AND FINAL ANSWER\n` +
+          `Your reasoning is displayed separately from your final answer.\n` +
+          `Use the reasoning channel to analyze the material and plan the response.\n` +
+          `The final answer must be completely self-contained and must include all relevant conclusions, facts, explanations, and examples discovered during reasoning.\n` +
+          `Never assume that information written in reasoning counts as part of the final answer.\n` +
+          `Do not return an outline-only final answer.\n`;
 
-        let instrNum2 = 0;
-        const next2 = () => `${++instrNum2}. `;
         const answerInstruction =
-          `\nANSWER INSTRUCTION\n` +
-          (primaryContext
-            ? `${next2()}Read the PRIMARY DOCUMENT first — it was identified as the most relevant source.\n`
-            : `${next2()}Read the documents below for relevant information.\n`) +
-          (correctedTermList.length > 0
-            ? `${next2()}Look specifically for ${correctedTermList.join(', ')} and any related comparison or distinction.\n`
-            : `${next2()}Identify the relevant concepts and relationships.\n`) +
-          `${next2()}Answer using the documents as your only source.\n` +
-          `${next2()}Use supporting documents only to clarify or corroborate.\n` +
-          (primaryContext && correctedTermList.length > 0
-            ? `${next2()}Do not say ${correctedTermList.join(' or ')} is absent unless it is absent from the PRIMARY DOCUMENT.\n`
-            : '') +
-          `${next2()}If you acknowledge a spelling correction, do so naturally in one sentence, then answer the question.\n` +
-          (isAmbiguous2
-            ? `${next2()}The question is vague — multiple pages match. List each matching page below as a numbered list (1, 2, 3...) and ASK the user which they meant. Do NOT pick one arbitrarily.\n`
-            : '') +
-          `${next2()}When listing items, number them sequentially (1, 2, 3...), never repeat the same number.\n`;
+          `\nFINAL ANSWER CONTRACT\n` +
+          `- Return a complete final answer, not an outline or writing plan.\n` +
+          `- The final answer must stand on its own without the reasoning section.\n` +
+          `- Include the relevant conclusions and details discovered during reasoning.\n` +
+          `- When asked for features or capabilities, enumerate every relevant feature explicitly.\n` +
+          `- Format each feature as: "- **Feature name:** One or more complete explanatory sentences."\n` +
+          `- Never output category headings without the corresponding details beneath them.\n` +
+          `- Use numbered lists only for ordered steps, rankings, or clarification choices.\n` +
+          `- Before finishing, verify that the final answer itself contains the requested information.\n`;
 
         const system =
-          `You are a specialized assistant that ONLY answers questions about this project's official documentation.\n\n` +
-          queryBlock +
+          `You are a specialized assistant that ONLY answers questions about this project's official documentation.\n` +
+          reasoningInstruction +
+          `\n${queryBlock}` +
           (primaryContext
             ? `\nPRIMARY DOCUMENT — READ THIS FIRST\n${primaryContext}\n`
             : '') +
@@ -512,6 +534,8 @@ export default {
           const dec = new TextDecoder();
           let buf = '';
           let firstToken = true;
+          let fullText = '';
+          let runaway = false;
 
           while (true) {
             let readResult;
@@ -560,21 +584,34 @@ export default {
                 await send({ thinking: reasoning });
               }
               if (content) {
+                fullText += content;
                 emittedText = true;
                 await send({ text: content });
+                if (fullText.length > 100 && /(\\|\/){20,}/.test(fullText.slice(-60))) {
+                  await send({ text: '\n\n[response truncated — model error]' });
+                  runaway = true;
+                  break;
+                }
               }
               if (!reasoning && !content) {
                 const text = upstream.extract(chunk);
                 if (text) {
+                  fullText += text;
                   emittedText = true;
                   await send({ text });
+                  if (fullText.length > 100 && /(\\|\/){20,}/.test(fullText.slice(-60))) {
+                    await send({ text: '\n\n[response truncated — model error]' });
+                    runaway = true;
+                    break;
+                  }
                 }
               }
             }
+            if (runaway) { reader.cancel(); break; }
           }
 
           if (!emittedText && hadThinking) {
-            await send({ text: thinkingText });
+            await send({ text: '\nThe model completed its reasoning but failed to produce a final answer.' });
           }
           if (emittedText || hadThinking) break;
         }

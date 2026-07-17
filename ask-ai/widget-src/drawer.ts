@@ -19,9 +19,11 @@ export class DrawerUI
   private readonly messagesEl: HTMLElement;
   private readonly inputEl: HTMLInputElement;
   private readonly submitEl: HTMLButtonElement;
+  private readonly stopEl: HTMLButtonElement;
   private readonly scrollBottomEl: HTMLButtonElement;
   private readonly messageEls: HTMLElement[] = [];
   private activeTranscript: Transcript | null = null;
+  private onStop: (() => void) | null = null;
 
   constructor(
     private readonly config: AskConfig,
@@ -43,6 +45,7 @@ export class DrawerUI
     this.messagesEl = this.query(".messages");
     this.inputEl = this.query<HTMLInputElement>("input");
     this.submitEl = this.query<HTMLButtonElement>("button[type=submit]");
+    this.stopEl = this.query<HTMLButtonElement>(".stop-btn");
     this.scrollBottomEl = this.query<HTMLButtonElement>(".scroll-bottom");
 
     // Restore saved drawer width
@@ -128,6 +131,13 @@ export class DrawerUI
   setBusy(busy: boolean): void
   {
     this.submitEl.disabled = busy;
+    this.submitEl.style.display = busy ? "none" : "";
+    this.stopEl.style.display = busy ? "" : "none";
+  }
+
+  setOnStop(callback: (() => void) | null): void
+  {
+    this.onStop = callback;
   }
 
   /** Re-attach host to document body after Material navigation swaps DOM. */
@@ -195,6 +205,7 @@ export class DrawerUI
         <form>
           <input type="text" autocomplete="off">
           <button type="submit">Ask</button>
+          <button type="button" class="stop-btn" style="display:none">Stop</button>
         </form>
       </section>`;
     const fragment = template.content;
@@ -224,6 +235,13 @@ export class DrawerUI
       if ((event as KeyboardEvent).key === "Escape")
       {
         this.close();
+      }
+    });
+    this.stopEl.addEventListener("click", () =>
+    {
+      if (this.onStop)
+      {
+        this.onStop();
       }
     });
     this.query("form").addEventListener("submit", (event) =>
@@ -386,7 +404,7 @@ export class DrawerUI
   {
     this.messagesEl.querySelector(".hint")?.remove();
     const element = document.createElement("div");
-    const body = document.createElement("span");
+    const body = document.createElement("div");
     body.className = "body";
     element.appendChild(body);
     this.messageEls[index] = element;
@@ -521,133 +539,14 @@ function buildSourceList(sources: readonly { title: string; url: string }[]): HT
   return details;
 }
 
-/** Render markdown to HTML — handles tables, headings, lists, code blocks, and inline formatting. */
+/** Render markdown to HTML using the marked library (loaded via CDN in mkdocs.yml). */
 function renderMarkdown(text: string): string
 {
-  const blocks = splitBlocks(text);
-  let html = blocks.map(renderBlock).join("\n");
-  // Merge adjacent ordered/unordered lists split by blank lines so
-  // numbering continues across items instead of restarting at 1.
-  html = html.replace(/<\/ol>\n<ol>/g, '');
-  html = html.replace(/<\/ul>\n<ul>/g, '');
-  return html;
-}
-
-function splitBlocks(text: string): string[]
-{
-  const blocks: string[] = [];
-  let buf = "";
-  let inFence = false;
-  let inTable = false;
-  for (const line of text.split("\n"))
+  const marked = (window as any).marked;
+  if (!marked)
   {
-    if (/^```/.test(line)) { inFence = !inFence; }
-    if (inFence) { buf += (buf ? "\n" : "") + line; continue; }
-    if (!inTable && /^\|.*\|$/.test(line.trim())) { inTable = true; }
-    if (inTable && line.trim() === "") { inTable = false; }
-    if (inTable) { buf += (buf ? "\n" : "") + line; continue; }
-    if (line.trim() === "") { if (buf) blocks.push(buf); buf = ""; continue; }
-    buf += (buf ? "\n" : "") + line;
+    // CDN script not loaded — minimal fallback
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
   }
-  if (buf) blocks.push(buf);
-  return blocks;
-}
-
-function renderBlock(block: string): string
-{
-  const lines = block.split("\n");
-  const first = lines[0].trim();
-  // Fenced code block
-  if (/^```/.test(first) && /```$/.test(lines[lines.length - 1].trim()))
-  {
-    const code = lines.slice(1, -1).join("\n");
-    return `<pre><code>${escapeHtml(code)}</code></pre>`;
-  }
-  // Table
-  if (lines.length >= 2 && /^\|.*\|$/.test(first) && /^\|[-:| ]+\|$/.test(lines[1].trim()))
-  {
-    return renderTable(lines);
-  }
-  // Heading
-  const h = first.match(/^(#{1,4})\s+(.+)/);
-  if (h) { return `<h${h[1].length}>${renderInline(h[2])}</h${h[1].length}>`; }
-  // HR
-  if (/^[-*]{3,}$/.test(first)) { return "<hr>"; }
-  // Unordered list
-  if (/^[-*]\s/.test(first))
-  {
-    const items = [];
-    let item = "";
-    for (const line of lines)
-    {
-      const m = line.match(/^[-*]\s+(.*)/);
-      if (m) { if (item) items.push(item); item = m[1]; }
-      else { item += " " + line.trim(); }
-    }
-    if (item) items.push(item);
-    return `<ul>${items.map(i => `<li>${renderInline(i)}</li>`).join("")}</ul>`;
-  }
-  // Ordered list
-  if (/^\d+\.\s/.test(first))
-  {
-    const items = [];
-    let item = "";
-    for (const line of lines)
-    {
-      const m = line.match(/^\d+\.\s+(.*)/);
-      if (m) { if (item) items.push(item); item = m[1]; }
-      else { item += " " + line.trim(); }
-    }
-    if (item) items.push(item);
-    return `<ol>${items.map(i => `<li>${renderInline(i)}</li>`).join("")}</ol>`;
-  }
-  // Blockquote
-  if (first.startsWith("> "))
-  {
-    const inner = lines.map(l => l.replace(/^> ?/, "")).join("\n");
-    return `<blockquote>${renderInline(inner)}</blockquote>`;
-  }
-  // Paragraph
-  return `<p>${renderInline(lines.join(" "))}</p>`;
-}
-
-function renderTable(lines: string[]): string
-{
-  const headerCells = lines[0].split("|").filter(c => c.trim() !== "").map(c => c.trim());
-  const bodyRows = lines.slice(2);
-  let html = "<table><thead><tr>";
-  for (const cell of headerCells) { html += `<th>${renderInline(cell)}</th>`; }
-  html += "</tr></thead><tbody>";
-  for (const row of bodyRows)
-  {
-    const cells = row.split("|").filter(c => c.trim() !== "").map(c => c.trim());
-    if (cells.length === 0) continue;
-    html += "<tr>";
-    for (const cell of cells) { html += `<td>${renderInline(cell)}</td>`; }
-    html += "</tr>";
-  }
-  html += "</tbody></table>";
-  return html;
-}
-
-function renderInline(text: string): string
-{
-  const escaped = escapeHtml(text);
-  // Bold first (handles ** inside links etc), then links, then code
-  return escaped
-    .replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
-    .replace(/\*([^*\n]+)\*/g, "<i>$1</i>")
-    .replace(
-      /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
-      '<a href="$2" target="_blank" rel="noopener">$1</a>',
-    )
-    .replace(/`([^`\n]+)`/g, "<code>$1</code>");
-}
-
-function escapeHtml(text: string): string
-{
-  const replacements: Record<string, string> = {
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-  };
-  return text.replace(/[&<>"']/g, (char) => replacements[char] ?? char);
+  return marked.parse(text, { gfm: true, breaks: false }) as string;
 }

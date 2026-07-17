@@ -46,3 +46,4 @@ themes/custom.css
 # generator vocabulary for documentation
 ask-ai/worker/src/data/
 .idea
+javascripts/ask/*.js
