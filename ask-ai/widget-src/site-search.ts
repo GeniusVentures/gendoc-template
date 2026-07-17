@@ -83,6 +83,13 @@ export async function searchHints(question: string): Promise<string> {
   // Yield to the event loop so the browser stays responsive.
   const yieldTick = () => new Promise<void>(r => setTimeout(r, 0));
 
+  // Compile fuzzy terms into a single regex so we test each doc once
+  // instead of calling String.includes() millions of times.
+  const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const fuzzyRegex = new RegExp(
+    [...fuzzyTerms].map(escapeRe).sort((a, b) => b.length - a.length).join('|')
+  );
+
   // Score every matching doc by how many raw query terms it matches.
   // ED1 variants are only for discovery — raw term count ranks docs so
   // rare corrected terms (e.g. "bittensor") surface above common ones
@@ -101,11 +108,8 @@ export async function searchHints(question: string): Promise<string> {
     const titleLower = (doc.title || '').toLowerCase();
     // Check both text and title for matches — some pages (like
     // /why-gnus.ai/customizable/) have the term only in the title.
-    let anyMatch = false;
-    for (const t of fuzzyTerms) {
-      if (text.includes(t) || titleLower.includes(t)) { anyMatch = true; break; }
-    }
-    if (!anyMatch) continue;
+    // Single regex test replaces N individual String.includes() calls.
+    if (!fuzzyRegex.test(text) && !fuzzyRegex.test(titleLower)) continue;
     // Score by raw term matches — title-only matches (term in title but
     // not body) get a bonus so pages whose title IS the query term rank
     // above pages that merely mention it.  Terms found in body text get
