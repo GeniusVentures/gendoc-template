@@ -48,10 +48,19 @@ export const PROVIDERS: Record<string, (env: Env, system: string, history: any[]
     const models = (env.OPENROUTER_MODELS || '').split(',').map(s => s.trim()).filter(Boolean);
     if (models.length === 0) return null;
 
+    // Nemotron 3's published generation config uses temperature 1.0 and
+    // top_p 0.95.  The previous 0.2 temperature made its final channel prone
+    // to collapsing into terse outline labels after otherwise good reasoning.
+    const isNemotron3 = models[0].toLowerCase().includes('nemotron-3-');
+
     const body: any = {
       stream: true,
-      temperature: 0.2,
-      reasoning: { enabled: true, exclude: false },
+      temperature: isNemotron3 ? 1.0 : 0.2,
+      ...(isNemotron3 ? { top_p: 0.95 } : {}),
+      // Keep reasoning visible, but reserve ample completion space for a
+      // self-contained final answer after the reasoning trace.
+      reasoning: { enabled: true, exclude: false, max_tokens: 2048 },
+      max_completion_tokens: 8192,
       messages: [
         { role: 'system', content: system },
         ...history.map(h => ({
