@@ -543,10 +543,12 @@ function buildSourceList(sources: readonly { title: string; url: string }[]): HT
 function renderMarkdown(text: string): string
 {
   const marked = (window as any).marked;
-  if (!marked)
+  const purifier = (window as any).DOMPurify;
+  if (!marked || !purifier)
   {
-    // CDN script not loaded — minimal fallback
+    // Fail closed if either CDN dependency is unavailable.
     return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
   }
-  return marked.parse(text, { gfm: true, breaks: false }) as string;
+  const html = marked.parse(text, { gfm: true, breaks: false }) as string;
+  return purifier.sanitize(html) as string;
 }
