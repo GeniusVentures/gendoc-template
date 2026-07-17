@@ -84,15 +84,17 @@ export const DRAWER_CSS = `
   .message {
     max-width: 88%; padding: 9px 12px; border-radius: 10px;
     font-size: 13.5px; line-height: 1.5;
-    white-space: pre-wrap; word-wrap: break-word;
+    word-wrap: break-word;
   }
   .message.user {
     align-self: flex-end; color: var(--ask-on-accent, #fff);
+    white-space: pre-wrap;
     background: var(--ask-accent, #2f6fed);
     border-bottom-right-radius: 3px;
   }
   .message.assistant {
     align-self: flex-start;
+    white-space: normal;
     background: var(--ask-msg-bg, #f1f4f7);
     border: 1px solid var(--ask-msg-border, #e2e8ee);
     border-bottom-left-radius: 3px;
@@ -107,9 +109,13 @@ export const DRAWER_CSS = `
   .message.assistant h2 { font-size: 15px; }
   .message.assistant h3 { font-size: 14px; }
   .message.assistant h4 { font-size: 13px; }
-  .message.assistant ul, .message.assistant ol { margin: 4px 0; padding-left: 18px; }
-  .message.assistant li { margin: 2px 0; }
-  .message.assistant p { margin: 4px 0; }
+  .message.assistant ul, .message.assistant ol {
+    margin: var(--ask-list-margin, 4px 0);
+    padding-left: var(--ask-list-padding, 18px);
+  }
+  .message.assistant li { margin: var(--ask-list-item-margin, 2px 0); }
+  .message.assistant p { margin: var(--ask-paragraph-margin, 4px 0); }
+  .message.assistant li > p { margin: var(--ask-list-paragraph-margin, 0); }
   .message.assistant table { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 12px; }
   .message.assistant th, .message.assistant td { border: 1px solid var(--ask-drawer-border, #d6dde3); padding: 4px 8px; text-align: left; }
   .message.assistant th { background: var(--ask-code-bg, #e6ebf1); font-weight: 600; }
