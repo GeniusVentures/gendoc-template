@@ -525,7 +525,12 @@ function buildSourceList(sources: readonly { title: string; url: string }[]): HT
 function renderMarkdown(text: string): string
 {
   const blocks = splitBlocks(text);
-  return blocks.map(renderBlock).join("\n");
+  let html = blocks.map(renderBlock).join("\n");
+  // Merge adjacent ordered/unordered lists split by blank lines so
+  // numbering continues across items instead of restarting at 1.
+  html = html.replace(/<\/ol>\n<ol>/g, '');
+  html = html.replace(/<\/ul>\n<ul>/g, '');
+  return html;
 }
 
 function splitBlocks(text: string): string[]

@@ -387,7 +387,11 @@ function buildSourceList(sources) {
 /** Render markdown to HTML — handles tables, headings, lists, code blocks, and inline formatting. */
 function renderMarkdown(text) {
     const blocks = splitBlocks(text);
-    return blocks.map(renderBlock).join("\n");
+    let html = blocks.map(renderBlock).join("\n");
+    // Merge adjacent ordered/unordered lists split by blank lines
+    html = html.replace(/<\/ol>\n<ol>/g, '');
+    html = html.replace(/<\/ul>\n<ul>/g, '');
+    return html;
 }
 function splitBlocks(text) {
     const blocks = [];

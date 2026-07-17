@@ -70,15 +70,38 @@ export async function searchHints(question: string): Promise<string> {
     ?.filter(t => !STOPWORDS.has(t)) || [];
   if (rawTerms.length === 0) return '';
 
-  // Expand each term with ED1 variants for fuzzy matching
-  const fuzzyTerms = new Set<string>();
-  for (const t of rawTerms) {
-    fuzzyTerms.add(t);
-    for (const v of ed1Variants(t)) fuzzyTerms.add(v);
-  }
-
   const docs = await loadDocs();
   if (docs.length === 0) return '';
+
+  // Exclude terms that appear in >50% of sampled docs — they match
+  // thousands of pages and provide zero ranking signal (e.g. "gnus"
+  // on a GNUS.AI site).  Still used for scoring, just not discovery.
+  const docFreq: Record<string, number> = {};
+  for (const t of rawTerms) docFreq[t] = 0;
+  const kDfSample = Math.min(docs.length, 2000);
+  for (let i = 0; i < kDfSample; i++) {
+    const haystack = ((docs[i].title || '') + ' ' + (docs[i].text || '')).toLowerCase();
+    for (const t of rawTerms) {
+      if (haystack.indexOf(t) >= 0) docFreq[t]++;
+    }
+  }
+  const kMaxDfRatio = 0.5;
+  const selective = rawTerms.filter(t => docFreq[t] / kDfSample <= kMaxDfRatio);
+  // If ALL terms are ubiquitous, fall back to all terms so we still get results.
+  const discoverTerms = selective.length > 0 ? selective : rawTerms;
+
+  // Only ED1-expand rare terms (df < threshold in sample) — they are the
+  // ones that might be misspelled (e.g. "bittensro").  Expanding common
+  // short terms like "gnus" produces 3-letter fragments that match
+  // thousands of unrelated docs and kill performance.
+  const kRareDfThreshold = 20;
+  const fuzzyTerms = new Set<string>();
+  for (const t of discoverTerms) {
+    fuzzyTerms.add(t);
+    if (docFreq[t] < kRareDfThreshold) {
+      for (const v of ed1Variants(t)) fuzzyTerms.add(v);
+    }
+  }
 
   // Yield to the event loop so the browser stays responsive.
   const yieldTick = () => new Promise<void>(r => setTimeout(r, 0));
