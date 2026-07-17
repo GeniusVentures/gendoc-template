@@ -453,7 +453,9 @@ the Python hooks, and typechecks the Ask AI worker on pull requests and pushes t
 or `main`.
 
 Parent projects can call the reusable `.github/workflows/deploy.yml` workflow. It deploys
-the Ask AI Worker first when `llms.ask.enabled` is true, then builds and deploys Pages.
+the Ask AI Worker first when `llms.ask.enabled` is true and the project owns its Worker,
+then builds and deploys Pages. A configured `llms.ask.endpoint` is treated as a shared or
+externally managed Worker and is left untouched unless `llms.ask.deploy_worker: true`.
 Add this small wrapper to the parent repository as `.github/workflows/deploy.yml`:
 
 ```yaml
