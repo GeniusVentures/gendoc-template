@@ -272,8 +272,9 @@ export default {
             ? `${next()}Do not say ${correctedTermList.join(' or ')} is absent unless it is absent from the material below.\n`
             : '') +
           (isAmbiguous
-            ? `${next()}The question is vague — multiple pages match. List each matching page below and ASK the user which they meant. Do NOT pick one arbitrarily.\n`
-            : '');
+            ? `${next()}The question is vague — multiple pages match. List each matching page below as a numbered list (1, 2, 3...) and ASK the user which they meant. Do NOT pick one arbitrarily.\n`
+            : '') +
+          `${next()}When listing items, number them sequentially (1, 2, 3...), never repeat the same number.\n`;
 
         let system: string;
         if (primaryContext) {
@@ -473,8 +474,9 @@ export default {
             : '') +
           `${next2()}If you acknowledge a spelling correction, do so naturally in one sentence, then answer the question.\n` +
           (isAmbiguous2
-            ? `${next2()}The question is vague — multiple pages match. List each matching page below and ASK the user which they meant. Do NOT pick one arbitrarily.\n`
-            : '');
+            ? `${next2()}The question is vague — multiple pages match. List each matching page below as a numbered list (1, 2, 3...) and ASK the user which they meant. Do NOT pick one arbitrarily.\n`
+            : '') +
+          `${next2()}When listing items, number them sequentially (1, 2, 3...), never repeat the same number.\n`;
 
         const system =
           `You are a specialized assistant that ONLY answers questions about this project's official documentation.\n\n` +
