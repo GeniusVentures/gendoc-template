@@ -79,8 +79,9 @@ jobs:
         run: npm install --global wrangler@4
 
       # Deploy first so deploy-ask.sh can capture a worker URL when the host
-      # does not configure llms.ask.endpoint explicitly. The following site
-      # build then publishes that endpoint in ask-config.json.
+      # does not configure llms.ask.endpoint explicitly. A configured endpoint
+      # normally denotes a shared/external Worker, so leave it untouched unless
+      # llms.ask.deploy_worker is explicitly enabled.
       - name: Deploy Ask AI Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -91,13 +92,15 @@ jobs:
           import yaml
 
           config = yaml.safe_load(Path("gendoc.yml").read_text(encoding="utf-8")) or {}
-          ask = (config.get("llms") or {}).get("ask") or {}
-          raise SystemExit(0 if (config.get("llms") or {}).get("enabled") and ask.get("enabled") else 1)
+          llms = config.get("llms") or {}
+          ask = llms.get("ask") or {}
+          deploy_worker = ask.get("deploy_worker", not bool(ask.get("endpoint")))
+          raise SystemExit(0 if llms.get("enabled") and ask.get("enabled") and deploy_worker else 1)
           PYTHON
           then
             bash "$TEMPLATE_PATH/scripts/deploy-ask.sh" gendoc.yml
           else
-            echo "Ask AI is disabled; skipping Worker deployment."
+            echo "Ask AI Worker is disabled or externally managed; skipping Worker deployment."
           fi
 
       - name: Generate Wrangler configuration
