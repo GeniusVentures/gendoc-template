@@ -41,6 +41,8 @@ export interface DocContent {
 
 export interface SSEMessage {
   text?: string;
+  /** Replace the current answer text, used when a streamed final fails validation. */
+  replaceText?: string;
   thinking?: string;
   sources?: Array<{ title: string; url: string }>;
   provider?: string;
