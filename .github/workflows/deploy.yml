@@ -1,4 +1,4 @@
-name: Build and deploy GenDoc
+name: Deploy GenDoc (Ask Worker and Pages)
 
 on:
   workflow_call:
@@ -20,7 +20,7 @@ on:
         type: string
     secrets:
       CLOUDFLARE_API_TOKEN:
-        description: Cloudflare API token with Pages edit access
+        description: Cloudflare API token with Pages and Workers edit access
         required: true
       CLOUDFLARE_ACCOUNT_ID:
         description: Cloudflare account identifier
@@ -77,6 +77,28 @@ jobs:
 
       - name: Install Wrangler
         run: npm install --global wrangler@4
+
+      # Deploy first so deploy-ask.sh can capture a worker URL when the host
+      # does not configure llms.ask.endpoint explicitly. The following site
+      # build then publishes that endpoint in ask-config.json.
+      - name: Deploy Ask AI Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if python - <<'PYTHON'
+          from pathlib import Path
+          import yaml
+
+          config = yaml.safe_load(Path("gendoc.yml").read_text(encoding="utf-8")) or {}
+          ask = (config.get("llms") or {}).get("ask") or {}
+          raise SystemExit(0 if (config.get("llms") or {}).get("enabled") and ask.get("enabled") else 1)
+          PYTHON
+          then
+            bash "$TEMPLATE_PATH/scripts/deploy-ask.sh" gendoc.yml
+          else
+            echo "Ask AI is disabled; skipping Worker deployment."
+          fi
 
       - name: Generate Wrangler configuration
         run: |
