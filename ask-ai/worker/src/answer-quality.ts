@@ -53,3 +53,42 @@ export function needsFinalAnswerRepair(
 
   return finalHeadings >= 3 && finalDetailedItems === 0 && bodyWords < 45;
 }
+
+function formatDetailedItem(item: string): string {
+  const bold = item.match(/^\*\*(.+?)\*\*\s*(?::|[—–-])\s*(.+)$/);
+  if (bold) return `- **${bold[1].replace(/:$/, '')}:** ${bold[2]}`;
+
+  const plain = item.match(/^(.+?)\s*(?::|[—–-])\s*(.+)$/);
+  if (plain) return `- **${plain[1].replace(/:$/, '')}:** ${plain[2]}`;
+
+  return `- ${item}`;
+}
+
+/**
+ * Rebuild an enumeration answer locally from detailed items already present
+ * in the displayed reasoning. No second provider request is made.
+ */
+export function repairFinalFromReasoning(
+  question: string,
+  finalText: string,
+  reasoningText: string,
+): string | null {
+  if (!needsFinalAnswerRepair(question, finalText, reasoningText)) return null;
+
+  const detailedItems = listItems(reasoningText).filter(isDetailedItem);
+  if (detailedItems.length < 3) return null;
+
+  const proseBlocks = finalText
+    .split(/\n\s*\n/)
+    .map(block => block.trim())
+    .filter(Boolean)
+    .filter(block => !/^\s{0,3}#{1,6}\s+/.test(block))
+    .filter(block => !/^\s*(?:[-*+]|\d+[.)])\s+/.test(block))
+    .filter(block => (block.match(/[\p{L}\p{N}]+/gu)?.length || 0) >= 8);
+
+  const intro = proseBlocks[0] || 'Based on the provided documentation:';
+  const conclusion = proseBlocks.length > 1 ? proseBlocks[proseBlocks.length - 1] : '';
+  const sections = [intro, detailedItems.map(formatDetailedItem).join('\n')];
+  if (conclusion && conclusion !== intro) sections.push(conclusion);
+  return sections.join('\n\n');
+}
