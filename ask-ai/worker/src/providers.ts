@@ -49,14 +49,24 @@ export const PROVIDERS: Record<string, (env: Env, system: string, history: any[]
     if (models.length === 0) return null;
 
     // Nemotron 3's published generation config uses temperature 1.0 and
-    // top_p 0.95.  The previous 0.2 temperature made its final channel prone
-    // to collapsing into terse outline labels after otherwise good reasoning.
-    const isNemotron3 = models[0].toLowerCase().includes('nemotron-3-');
+    // top_p 0.95. OpenRouter applies request parameters to every entry in a
+    // fallback list, so only force those values when every model is Nemotron 3.
+    // For a mixed list, omit sampling parameters and preserve each model's
+    // provider defaults rather than leaking one family's settings to another.
+    const nemotronModels = models.filter(model =>
+      model.toLowerCase().includes('nemotron-3-')
+    );
+    const allNemotron3 = nemotronModels.length === models.length;
+    const mixedWithNemotron3 =
+      nemotronModels.length > 0 && !allNemotron3;
 
     const body: any = {
       stream: true,
-      temperature: isNemotron3 ? 1.0 : 0.2,
-      ...(isNemotron3 ? { top_p: 0.95 } : {}),
+      ...(allNemotron3
+        ? { temperature: 1.0, top_p: 0.95 }
+        : mixedWithNemotron3
+          ? {}
+          : { temperature: 0.2 }),
       // Keep reasoning visible, but reserve ample completion space for a
       // self-contained final answer after the reasoning trace.
       reasoning: { enabled: true, exclude: false, max_tokens: 2048 },
@@ -73,7 +83,6 @@ export const PROVIDERS: Record<string, (env: Env, system: string, history: any[]
 
     if (models.length > 1) {
       body.models = models;
-      body.route = 'fallback';
     } else {
       body.model = models[0];
     }
