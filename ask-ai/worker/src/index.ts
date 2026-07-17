@@ -609,7 +609,6 @@ export default {
             if (runaway) { reader.cancel(); break; }
           }
 
-
           if (!emittedText && hadThinking) {
             await send({ text: '\nThe model completed its reasoning but failed to produce a final answer.' });
           }
