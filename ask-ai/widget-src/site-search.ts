@@ -87,18 +87,29 @@ export async function searchHints(question: string): Promise<string> {
   const scored: Array<{ doc: SearchDoc; score: number; bestIdx: number }> = [];
   for (const doc of docs) {
     const text = (doc.text || '').toLowerCase();
-    // First pass: does ANY fuzzy term match? (ED1 discovery)
+    const titleLower = (doc.title || '').toLowerCase();
+    // Check both text and title for matches — some pages (like
+    // /why-gnus.ai/customizable/) have the term only in the title.
     let anyMatch = false;
     for (const t of fuzzyTerms) {
-      if (text.includes(t)) { anyMatch = true; break; }
+      if (text.includes(t) || titleLower.includes(t)) { anyMatch = true; break; }
     }
     if (!anyMatch) continue;
-    // Second pass: score by raw term matches only
+    // Score by raw term matches — title-only matches (term in title but
+    // not body) get a bonus so pages whose title IS the query term rank
+    // above pages that merely mention it.  Terms found in body text get
+    // no title bonus — prevents common terms like "gnus" from inflating
+    // every page whose title includes them.
     let matchCount = 0;
     let bestIdx = Infinity;
     for (const t of rawTerms) {
       const idx = text.indexOf(t);
-      if (idx >= 0) { matchCount++; if (idx < bestIdx) bestIdx = idx; }
+      if (idx >= 0) {
+        matchCount++;
+        if (idx < bestIdx) bestIdx = idx;
+      } else if (titleLower.includes(t)) {
+        matchCount += 3;  // title-only match
+      }
     }
     // Also check fuzzy terms for bestIdx (the snippet anchor)
     if (bestIdx === Infinity) {

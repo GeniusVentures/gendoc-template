@@ -248,18 +248,31 @@ export default {
             `Compare or answer about: ${correctedTermList.join(', ')}\n`;
         }
 
+        // Count unique hint pages (strip hash fragments to get page-level URLs).
+        const hintPages = searchHints
+          ? new Set(searchHints.split('\n')
+              .map(l => l.match(/\(([^)]+)\)/)?.[1]?.replace(/#.*$/, ''))
+              .filter(Boolean))
+          : new Set<string>();
+        const isAmbiguous = hintPages.size >= 3;
+
+        let instrNum = 0;
+        const next = () => `${++instrNum}. `;
         const answerInstruction =
           `\nANSWER INSTRUCTION\n` +
           (primaryContext
-            ? `1. Read the PRIMARY DOCUMENT — it was identified as the most relevant source.\n`
-            : `1. Read the SEARCH HINTS below — they were identified as highly relevant.\n`) +
+            ? `${next()}Read the PRIMARY DOCUMENT — it was identified as the most relevant source.\n`
+            : `${next()}Read the SEARCH HINTS below — they were identified as highly relevant.\n`) +
           (correctedTermList.length > 0
-            ? `2. Look specifically for ${correctedTermList.join(', ')} and any related comparison.\n`
-            : `2. Identify the relevant concepts.\n`) +
-          `3. Answer using only the provided material.\n` +
-          `4. If you acknowledge a spelling correction, do so in one sentence, then answer.\n` +
+            ? `${next()}Look specifically for ${correctedTermList.join(', ')} and any related comparison.\n`
+            : `${next()}Identify the relevant concepts.\n`) +
+          `${next()}Answer using only the provided material.\n` +
+          `${next()}If you acknowledge a spelling correction, do so in one sentence, then answer.\n` +
           (correctedTermList.length > 0
-            ? `5. Do not say ${correctedTermList.join(' or ')} is absent unless it is absent from the material below.\n`
+            ? `${next()}Do not say ${correctedTermList.join(' or ')} is absent unless it is absent from the material below.\n`
+            : '') +
+          (isAmbiguous
+            ? `${next()}The question is vague — multiple pages match. List each matching page below and ASK the user which they meant. Do NOT pick one arbitrarily.\n`
             : '');
 
         let system: string;
@@ -292,6 +305,23 @@ export default {
             `AVAILABLE TOPICS:\n${catalogOverview}`;
         }
 
+
+        // Send sources before streaming — tests and UI need them even on hints-only path.
+        // Include ALL hints as sources, not just the primary doc.
+        const sourcesForSend: Array<{ title: string; url: string }> = [];
+        if (primaryContext) sourcesForSend.push({ title: hintedTitle, url: hintedUrl });
+        if (searchHints) {
+          for (const hintLine of searchHints.split('\n')) {
+            const sm = hintLine.match(/^- \[([^\]]+)\]\(([^)]+)\)/);
+            if (!sm) continue;
+            const sUrl = sm[2];
+            if (sUrl.startsWith('#') && !sUrl.startsWith('#/')) continue;
+            // Don't duplicate the primary doc
+            if (sUrl === hintedUrl) continue;
+            sourcesForSend.push({ title: sm[1], url: sUrl });
+          }
+        }
+        await send({ sources: sourcesForSend });
 
         const chain = (env.PROVIDERS || 'openrouter,gemini').split(',').map(s => s.trim());
         for (const name of chain) {
@@ -418,20 +448,33 @@ export default {
             `Use the documents below to find the closest match.\n`;
         }
 
+        // Count unique hint pages (strip hash fragments to get page-level URLs).
+        const hintPages2 = searchHints
+          ? new Set(searchHints.split('\n')
+              .map(l => l.match(/\(([^)]+)\)/)?.[1]?.replace(/#.*$/, ''))
+              .filter(Boolean))
+          : new Set<string>();
+        const isAmbiguous2 = hintPages2.size >= 3;
+
+        let instrNum2 = 0;
+        const next2 = () => `${++instrNum2}. `;
         const answerInstruction =
           `\nANSWER INSTRUCTION\n` +
           (primaryContext
-            ? `1. Read the PRIMARY DOCUMENT first — it was identified as the most relevant source.\n`
-            : `1. Read the documents below for relevant information.\n`) +
+            ? `${next2()}Read the PRIMARY DOCUMENT first — it was identified as the most relevant source.\n`
+            : `${next2()}Read the documents below for relevant information.\n`) +
           (correctedTermList.length > 0
-            ? `2. Look specifically for ${correctedTermList.join(', ')} and any related comparison or distinction.\n`
-            : `2. Identify the relevant concepts and relationships.\n`) +
-          `3. Answer using the documents as your only source.\n` +
-          `4. Use supporting documents only to clarify or corroborate.\n` +
+            ? `${next2()}Look specifically for ${correctedTermList.join(', ')} and any related comparison or distinction.\n`
+            : `${next2()}Identify the relevant concepts and relationships.\n`) +
+          `${next2()}Answer using the documents as your only source.\n` +
+          `${next2()}Use supporting documents only to clarify or corroborate.\n` +
           (primaryContext && correctedTermList.length > 0
-            ? `5. Do not say ${correctedTermList.join(' or ')} is absent unless it is absent from the PRIMARY DOCUMENT.\n`
+            ? `${next2()}Do not say ${correctedTermList.join(' or ')} is absent unless it is absent from the PRIMARY DOCUMENT.\n`
             : '') +
-          `6. If you acknowledge a spelling correction, do so naturally in one sentence, then answer the question.\n`;
+          `${next2()}If you acknowledge a spelling correction, do so naturally in one sentence, then answer the question.\n` +
+          (isAmbiguous2
+            ? `${next2()}The question is vague — multiple pages match. List each matching page below and ASK the user which they meant. Do NOT pick one arbitrarily.\n`
+            : '');
 
         const system =
           `You are a specialized assistant that ONLY answers questions about this project's official documentation.\n\n` +
