@@ -8,7 +8,6 @@
  *   2. { provider }-- exactly once, provider name (e.g. "gemini", "openrouter")
  *   3. { thinking }-- zero or more reasoning deltas (collapsible by UI)
  *   4. { text }    -- zero or more incremental answer deltas
- *      { replaceText } -- optional reset before a repaired answer
  *   5. { done }    -- exactly once, terminal
  *
  * If/when ask-worker migrates to TypeScript it should import these types
@@ -27,8 +26,6 @@ export interface SseEvent {
   readonly provider?: string;
   readonly thinking?: string;
   readonly text?: string;
-  /** Replace accumulated answer text before streaming a repaired final. */
-  readonly replaceText?: string;
   readonly done?: boolean;
 }
 
