@@ -16,6 +16,7 @@ import { loadCatalog, scoreEntries, fetchDoc } from './catalog.js';
 import { extractTerms, ed1Variants } from './normalizer.js';
 import { isJailbreakAttempt } from './jailbreak.js';
 import { PROVIDERS } from './providers.js';
+import { repairFinalFromReasoning } from './answer-quality.js';
 
 /** Levenshtein edit distance.  Catch-all when ED1 Set lookup finds nothing. */
 function editDist(a: string, b: string): number {
@@ -279,7 +280,6 @@ export default {
           (correctedTermList.length > 0
             ? `${next()}Do not say ${correctedTermList.join(' or ')} is absent unless it is absent from the material below.\n`
             : '') +
-          `${next()}When listing items, number them sequentially (1, 2, 3...), never repeat the same number.\n` +
           `\nOUTPUT REQUIREMENTS\n` +
           `${next()}Begin with a direct answer to the user's question.\n` +
           `${next()}Preserve all relevant names, facts, figures, comparisons, qualifications, and examples found in the provided material. Do not omit relevant details merely to make the answer shorter.\n` +
@@ -608,6 +608,16 @@ export default {
               }
             }
             if (runaway) { reader.cancel(); break; }
+          }
+
+          const repairedFinal = repairFinalFromReasoning(question, fullText, thinkingText);
+          if (repairedFinal) {
+            // The original final was only headings/labels. Replace it with a
+            // deterministic Markdown answer assembled from detailed items in
+            // the already-displayed reasoning; do not make another LLM call.
+            fullText = repairedFinal;
+            emittedText = true;
+            await send({ replaceText: repairedFinal });
           }
 
           if (!emittedText && hadThinking) {
