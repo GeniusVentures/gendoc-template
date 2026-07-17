@@ -63,6 +63,10 @@ async function main(): Promise<void>
         {
           transcript.appendThinking(answerIndex, event.thinking);
         }
+        if (event.replaceText !== undefined)
+        {
+          transcript.setText(answerIndex, event.replaceText);
+        }
         if (event.text !== undefined)
         {
           transcript.appendText(answerIndex, event.text);
