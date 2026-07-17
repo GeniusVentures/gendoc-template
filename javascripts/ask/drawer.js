@@ -309,6 +309,7 @@ export class DrawerUI {
                 if (!thinkEl) {
                     thinkEl = document.createElement("details");
                     thinkEl.className = "thinking";
+                    thinkEl.open = false;
                     const summary = document.createElement("summary");
                     summary.textContent = "Thinking…";
                     thinkEl.appendChild(summary);
@@ -317,7 +318,6 @@ export class DrawerUI {
                     element.insertBefore(thinkEl, body);
                 }
                 thinkEl.lastElementChild.textContent = message.thinking;
-                thinkEl.open = false;
                 // Animate "Thinking…" dots while answer hasn't started
                 thinkEl.classList.toggle('streaming', !message.text || message.text === '…');
             }
