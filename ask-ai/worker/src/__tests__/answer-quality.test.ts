@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { needsFinalAnswerRepair } from '../answer-quality.js';
+import { needsFinalAnswerRepair, repairFinalFromReasoning } from '../answer-quality.js';
 
 const reasoning = `
 The primary document identifies these features:
@@ -37,5 +37,11 @@ GAML provides structured long-term memory for GNUS nodes.
 assert.equal(needsFinalAnswerRepair('What are the GAML features?', outlineOnly, reasoning), true);
 assert.equal(needsFinalAnswerRepair('What are the GAML features?', complete, reasoning), false);
 assert.equal(needsFinalAnswerRepair('What is GAML?', 'GAML is a memory layer.', reasoning), false);
+
+const repaired = repairFinalFromReasoning('What are the GAML features?', outlineOnly, reasoning);
+assert.ok(repaired);
+assert.match(repaired, /\*\*Persistent structured memory:\*\*/);
+assert.match(repaired, /Preserves reusable state across GNUS nodes/);
+assert.doesNotMatch(repaired, /^## Core Purpose$/m);
 
 console.log('answer-quality tests passed');
