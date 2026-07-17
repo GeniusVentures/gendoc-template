@@ -48,10 +48,29 @@ export const PROVIDERS: Record<string, (env: Env, system: string, history: any[]
     const models = (env.OPENROUTER_MODELS || '').split(',').map(s => s.trim()).filter(Boolean);
     if (models.length === 0) return null;
 
+    // Nemotron 3's published generation config uses temperature 1.0 and
+    // top_p 0.95. OpenRouter applies request parameters to every entry in a
+    // fallback list, so only force those values when every model is Nemotron 3.
+    // For a mixed list, omit sampling parameters and preserve each model's
+    // provider defaults rather than leaking one family's settings to another.
+    const nemotronModels = models.filter(model =>
+      model.toLowerCase().includes('nemotron-3-')
+    );
+    const allNemotron3 = nemotronModels.length === models.length;
+    const mixedWithNemotron3 =
+      nemotronModels.length > 0 && !allNemotron3;
+
     const body: any = {
       stream: true,
-      temperature: 0.2,
-      reasoning: { enabled: true, exclude: false },
+      ...(allNemotron3
+        ? { temperature: 1.0, top_p: 0.95 }
+        : mixedWithNemotron3
+          ? {}
+          : { temperature: 0.2 }),
+      // Keep reasoning visible, but reserve ample completion space for a
+      // self-contained final answer after the reasoning trace.
+      reasoning: { enabled: true, exclude: false, max_tokens: 2048 },
+      max_completion_tokens: 8192,
       messages: [
         { role: 'system', content: system },
         ...history.map(h => ({
@@ -64,7 +83,6 @@ export const PROVIDERS: Record<string, (env: Env, system: string, history: any[]
 
     if (models.length > 1) {
       body.models = models;
-      body.route = 'fallback';
     } else {
       body.model = models[0];
     }

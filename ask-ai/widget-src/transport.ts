@@ -8,7 +8,7 @@ import { searchHints } from "./site-search.js";
  * so the UI is transport-agnostic.
  */
 export interface AskTransport {
-  ask(question: string, history: readonly ChatTurn[]): AsyncGenerator<SseEvent>;
+  ask(question: string, history: readonly ChatTurn[], signal?: AbortSignal): AsyncGenerator<SseEvent>;
 }
 
 /** Pick the best available transport, or null if none can work. */
@@ -23,7 +23,7 @@ export function createTransport(config: AskConfig): AskTransport | null {
 class RemoteTransport implements AskTransport {
   constructor(private readonly config: AskConfig) {}
 
-  async *ask(question: string, history: readonly ChatTurn[]): AsyncGenerator<SseEvent> {
+  async *ask(question: string, history: readonly ChatTurn[], signal?: AbortSignal): AsyncGenerator<SseEvent> {
     const corrected = (window as any).fuzzyCorrect ? (window as any).fuzzyCorrect(question) : question;
     const hints = await searchHints(corrected);
     const body: AskRequest = { question, history, search_hints: hints || undefined };
@@ -31,6 +31,7 @@ class RemoteTransport implements AskTransport {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal,
     });
     if (!res.ok || res.body === null) {
       let message = `ask endpoint returned HTTP ${res.status}`;
@@ -94,8 +95,9 @@ class LocalPromptTransport implements AskTransport {
 
   constructor(private readonly config: AskConfig) {}
 
-  async *ask(question: string, _history: readonly ChatTurn[]): AsyncGenerator<SseEvent> {
+  async *ask(question: string, _history: readonly ChatTurn[], signal?: AbortSignal): AsyncGenerator<SseEvent> {
     yield { sources: [] };
+    if (signal?.aborted) return;
     if ((await LanguageModel.availability()) === "unavailable") {
       yield { text: "On-device AI isn't available in this browser." };
       yield { done: true };
@@ -115,9 +117,10 @@ class LocalPromptTransport implements AskTransport {
     try {
       const stream = session.promptStreaming(`Context:\n${context}\n\nQuestion: ${question}`);
       for await (const chunk of stream) {
+        if (signal?.aborted) break;
         yield { text: chunk };
       }
-      yield { done: true };
+      if (!signal?.aborted) yield { done: true };
     } finally {
       session.destroy();
     }

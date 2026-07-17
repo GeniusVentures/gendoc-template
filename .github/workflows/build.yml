@@ -132,6 +132,9 @@ jobs:
       - name: Typecheck worker
         run: npm run typecheck --prefix ask-ai/worker
 
+      - name: Build browser widget
+        run: ./ask-ai/worker/node_modules/.bin/tsc -p ask-ai/widget-src
+
       - name: Check browser JavaScript syntax
         run: |
           node --check javascripts/ask/main.js
