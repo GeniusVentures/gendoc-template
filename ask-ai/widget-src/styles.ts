@@ -82,7 +82,7 @@ export const DRAWER_CSS = `
     box-shadow: 0 2px 8px rgba(0,0,0,.15);
   }
   .message {
-    max-width: 88%; padding: 9px 12px; border-radius: 10px;
+    min-width: 0; max-width: 88%; padding: 9px 12px; border-radius: 10px;
     font-size: 13.5px; line-height: 1.5;
     word-wrap: break-word;
   }
@@ -109,18 +109,32 @@ export const DRAWER_CSS = `
   .message.assistant h2 { font-size: 15px; }
   .message.assistant h3 { font-size: 14px; }
   .message.assistant h4 { font-size: 13px; }
+  .message.assistant .body {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .message.assistant .body > :first-child { margin-top: 0; }
+  .message.assistant .body > :last-child { margin-bottom: 0; }
   .message.assistant ul, .message.assistant ol {
     margin: var(--ask-list-margin, 4px 0);
-    padding-left: var(--ask-list-padding, 18px);
   }
+  .message.assistant ul { padding-left: var(--ask-list-padding, 20px); }
+  .message.assistant ol { padding-left: var(--ask-ordered-list-padding, 26px); }
   .message.assistant li { margin: var(--ask-list-item-margin, 2px 0); }
   .message.assistant p { margin: var(--ask-paragraph-margin, 4px 0); }
   .message.assistant li > p { margin: var(--ask-list-paragraph-margin, 0); }
-  .message.assistant table { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 12px; }
+  .message.assistant table {
+    display: block; max-width: 100%; width: 100%; overflow-x: auto;
+    border-collapse: collapse; margin: 6px 0; font-size: 12px;
+  }
   .message.assistant th, .message.assistant td { border: 1px solid var(--ask-drawer-border, #d6dde3); padding: 4px 8px; text-align: left; }
   .message.assistant th { background: var(--ask-code-bg, #e6ebf1); font-weight: 600; }
   .message.assistant tr:nth-child(even) td { background: var(--ask-msg-bg, #f1f4f7); }
-  .message.assistant pre { margin: 6px 0; padding: 8px 10px; background: var(--ask-code-bg, #e6ebf1); border-radius: 4px; overflow-x: auto; font-size: 12px; }
+  .message.assistant pre {
+    max-width: 100%; margin: 6px 0; padding: 8px 10px;
+    background: var(--ask-code-bg, #e6ebf1); border-radius: 4px;
+    overflow-x: auto; font-size: 12px;
+  }
   .message.assistant pre code { background: none; padding: 0; }
   .message.assistant blockquote { margin: 6px 0; padding: 4px 10px; border-left: 3px solid var(--ask-accent, #2f6fed); color: var(--ask-muted-fg, #6b7b8b); }
   .message.assistant hr { border: 0; border-top: 1px solid var(--ask-drawer-border, #d6dde3); margin: 8px 0; }
