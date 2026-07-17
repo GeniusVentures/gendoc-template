@@ -130,13 +130,13 @@ llms:
 
   # -- Ask AI Widget (optional) -------------------------------------------------
   # Floating "Ask" button + chat drawer that answers questions only from your
-  # docs. Requires a Cloudflare Worker (deployed by setup.sh).  When
-  # `endpoint` is set, setup.sh injects a route into the wrangler config so
-  # traffic to that domain reaches this worker -- use this for sharing one
-  # worker across multiple projects.
+  # docs. Requires a Cloudflare Worker (deployed by setup.sh). When `endpoint`
+  # points at an existing shared Worker, CI uses it without deploying another
+  # Worker. Set deploy_worker: true only when this project owns that endpoint.
   ask:
     enabled: false
     # endpoint: "https://ask.mysite.com/api/ask"   # custom-domain / shared-worker (optional)
+    # deploy_worker: false                          # default when endpoint is set
     # title: "Ask MyProject"
     # placeholder: "Ask a question..."
     # worker_name: "myproject-docs-ask"            # default: <pages_project_name>-ask
