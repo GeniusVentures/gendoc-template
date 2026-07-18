@@ -86,24 +86,28 @@ else
     exit $exit_code
 fi
 
-# ── Step 2: Regenerate index.md (from hand-written doc headings) ─────────────
+# ── Step 2: Regenerate configured navigation index ────────────────────────────
 GENERATE_INDEX=$(read_yaml "navigation.generate_index")
+INDEX_TEMPLATE=$(read_yaml "navigation.index_template")
+INDEX_OUTPUT=$(read_yaml "navigation.index_output")
 HANDWRITTEN_DOCS=$(read_yaml "paths.handwritten_docs")
 INDEX_SCRIPT="$SCRIPT_DIR/generate-index.sh"
 HANDWRITTEN_DOCS_ABS="$HOST_ROOT/$HANDWRITTEN_DOCS"
+INDEX_TEMPLATE="${INDEX_TEMPLATE:-index.md.template}"
+INDEX_OUTPUT="${INDEX_OUTPUT:-index.md}"
 echo ""
 echo "=============================================="
-echo "  Step 2: Regenerating index.md"
+echo "  Step 2: Regenerating $INDEX_OUTPUT"
 echo "=============================================="
 if [ "$GENERATE_INDEX" != "true" ]; then
     echo "  Skipped — navigation.generate_index is not true"
 elif [ ! -f "$INDEX_SCRIPT" ]; then
     echo "  Skipped — generate-index.sh not found at $INDEX_SCRIPT"
-elif [ ! -f "$HANDWRITTEN_DOCS_ABS/index.md.template" ]; then
-    echo "  Skipped — index.md.template not found in $HANDWRITTEN_DOCS"
+elif [ ! -f "$HANDWRITTEN_DOCS_ABS/$INDEX_TEMPLATE" ]; then
+    echo "  Skipped — $INDEX_TEMPLATE not found in $HANDWRITTEN_DOCS"
 else
-    bash "$INDEX_SCRIPT" "$HANDWRITTEN_DOCS_ABS"
-    echo "  index.md regenerated from $HANDWRITTEN_DOCS/index.md.template"
+    bash "$INDEX_SCRIPT" "$HANDWRITTEN_DOCS_ABS" "$INDEX_TEMPLATE" "$INDEX_OUTPUT"
+    echo "  $INDEX_OUTPUT regenerated from $HANDWRITTEN_DOCS/$INDEX_TEMPLATE"
 fi
 
 # ── Step 3: Compile widget TypeScript (before mkdocs copies JS) ────────────
@@ -170,7 +174,7 @@ echo "  Step 8:  Gzipping JSON files for dev server"
 echo "=============================================="
 
 GZIP_JSON=$(read_yaml "deploy.cloudflare.gzip_json")
-GZIP_JSON="${GZIP_JSON:-True}"  # default to True (matches load-gendoc-config.py)
+GZIP_JSON="${GZIP_JSON:-True}"
 if [ "$GZIP_JSON" = "True" ]; then
     count=0
     while IFS= read -r -d '' f; do
