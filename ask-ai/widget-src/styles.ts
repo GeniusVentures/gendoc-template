@@ -5,7 +5,15 @@
  * Shadow DOM inherits custom properties from the light DOM automatically.
  */
 export const DRAWER_CSS = `
-  :host { all: initial; }
+  :host {
+    all: initial;
+    position: fixed;
+    inset: 0;
+    width: 0;
+    height: 0;
+    overflow: visible;
+    z-index: 9998;
+  }
   * { box-sizing: border-box; font-family: var(--ask-font, system-ui, -apple-system, "Segoe UI", sans-serif); }
 
   .fab {
@@ -73,6 +81,7 @@ export const DRAWER_CSS = `
   .messages {
     flex: 1; min-width: 0; max-width: 100%; overflow-y: auto; overflow-x: hidden; padding: 14px;
     display: flex; flex-direction: column; gap: 10px;
+    overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
   }
   .scroll-bottom {
     position: absolute; bottom: 60px; right: 20px; z-index: 10;
@@ -216,7 +225,10 @@ export const DRAWER_CSS = `
     text-transform: uppercase; letter-spacing: .5px;
     margin: 0 0 4px 0;
   }
-  .hint { color: var(--ask-muted-fg, #5c6b78); font-size: 12.5px; margin: auto; text-align: center; padding: 0 20px; }
+  .hint {
+    max-width: 100%; overflow-wrap: anywhere;
+    color: var(--ask-muted-fg, #5c6b78); font-size: 12.5px; margin: auto; text-align: center; padding: 0 20px;
+  }
 
   form {
     flex: none; display: flex; width: 100%; min-width: 0; gap: 8px; padding: 12px;
@@ -242,13 +254,15 @@ export const DRAWER_CSS = `
      over the inline saved-width style set by DrawerUI. */
   @media (max-width: 700px) {
     .drawer {
-      position: absolute;
-      left: var(--ask-viewport-left, 0px); right: auto;
+      position: fixed;
+      left: 0; right: 0;
       top: var(--ask-viewport-top, 0px); bottom: auto;
-      width: var(--ask-viewport-width, 100vw) !important;
+      width: 100% !important;
       height: var(--ask-viewport-height, 100dvh);
-      min-width: 0; max-width: none;
+      min-width: 0; max-width: 100%;
       border-left: 0; overflow: hidden;
+      contain: layout paint;
+      overscroll-behavior: none;
     }
     .drawer::before { display: none; }
     .head {
