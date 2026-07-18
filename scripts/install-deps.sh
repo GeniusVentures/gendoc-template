@@ -66,12 +66,31 @@ install_doxybook2() {
 
     # ── Download ──────────────────────────────────────────────────────────────
     echo "  Downloading ${zip_name}..."
-    if ! curl -fSL --progress-bar -o "${zip_path}" "${download_url}"; then
-        echo "Error: failed to download ${download_url}" >&2
-        rm -rf "${tmp_dir}"
-        exit 1
-    fi
-    echo "  Download complete (${tmp_dir}/${zip_name})"
+    local attempt
+    for attempt in 1 2 3; do
+        rm -f "${zip_path}"
+        if curl --fail --location --show-error --silent \
+            --retry 3 --retry-all-errors --connect-timeout 15 --max-time 120 \
+            --output "${zip_path}" "${download_url}" \
+            && unzip -t "${zip_path}" >/dev/null; then
+            break
+        fi
+
+        echo "  Download validation failed (attempt ${attempt}/3)." >&2
+        if [ -f "${zip_path}" ]; then
+            echo "  Received: $(file -b "${zip_path}")" >&2
+            ls -lh "${zip_path}" >&2
+            echo "  ZIP validation output:" >&2
+            unzip -t "${zip_path}" >&2 || true
+        fi
+        if [ "${attempt}" -eq 3 ]; then
+            echo "Error: failed to download a valid ZIP from ${download_url}" >&2
+            rm -rf "${tmp_dir}"
+            exit 1
+        fi
+        sleep 2
+    done
+    echo "  Download complete ($(du -h "${zip_path}" | cut -f1))"
 
     # ── Extract ───────────────────────────────────────────────────────────────
     echo "  Extracting..."
