@@ -95,9 +95,15 @@ install_doxybook2() {
     # ── Extract ───────────────────────────────────────────────────────────────
     echo "  Extracting..."
     if ! unzip -o "${zip_path}" -d "${tmp_dir}"; then
-        echo "Error: failed to unzip ${zip_path}" >&2
-        rm -rf "${tmp_dir}"
-        exit 1
+        # Some runner-provided unzip builds report a warning exit code after
+        # successfully writing every member. The binary is the only artifact
+        # needed here, so distinguish that case from an incomplete extraction.
+        if [ ! -f "${tmp_dir}/bin/doxybook2" ]; then
+            echo "Error: failed to extract doxybook2 from ${zip_path}" >&2
+            rm -rf "${tmp_dir}"
+            exit 1
+        fi
+        echo "  unzip returned a warning status; binary was extracted." >&2
     fi
 
     # ── Find the binary in the extracted contents ────────────────────────────
