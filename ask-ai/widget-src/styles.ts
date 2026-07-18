@@ -242,6 +242,7 @@ export const DRAWER_CSS = `
      over the inline saved-width style set by DrawerUI. */
   @media (max-width: 700px) {
     .drawer {
+      position: absolute;
       left: var(--ask-viewport-left, 0px); right: auto;
       top: var(--ask-viewport-top, 0px); bottom: auto;
       width: var(--ask-viewport-width, 100vw) !important;
