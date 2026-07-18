@@ -48,6 +48,14 @@ export class DrawerUI
     this.stopEl = this.query<HTMLButtonElement>(".stop-btn");
     this.scrollBottomEl = this.query<HTMLButtonElement>(".scroll-bottom");
 
+    // On iOS the software keyboard changes the visual viewport without
+    // necessarily changing the layout viewport used by position: fixed.
+    // Track its exact box so the header and composer both remain visible.
+    this.syncVisualViewport();
+    window.addEventListener("resize", this.syncVisualViewport);
+    window.visualViewport?.addEventListener("resize", this.syncVisualViewport);
+    window.visualViewport?.addEventListener("scroll", this.syncVisualViewport);
+
     // Restore saved drawer width
     const savedWidth = localStorage.getItem('ask-drawer-width');
     if (savedWidth)
@@ -160,6 +168,30 @@ export class DrawerUI
     const isDark = (document.body.getAttribute('data-md-color-media') || '').includes('dark');
     this.drawer.setAttribute('data-theme', isDark ? 'dark' : 'light');
   }
+
+  private readonly syncVisualViewport = (): void =>
+  {
+    const properties = [
+      "--ask-viewport-left",
+      "--ask-viewport-top",
+      "--ask-viewport-width",
+      "--ask-viewport-height",
+    ];
+    if (!window.matchMedia("(max-width: 700px)").matches)
+    {
+      for (const property of properties)
+      {
+        this.drawer.style.removeProperty(property);
+      }
+      return;
+    }
+
+    const viewport = window.visualViewport;
+    this.drawer.style.setProperty("--ask-viewport-left", `${viewport?.offsetLeft ?? 0}px`);
+    this.drawer.style.setProperty("--ask-viewport-top", `${viewport?.offsetTop ?? 0}px`);
+    this.drawer.style.setProperty("--ask-viewport-width", `${viewport?.width ?? window.innerWidth}px`);
+    this.drawer.style.setProperty("--ask-viewport-height", `${viewport?.height ?? window.innerHeight}px`);
+  };
 
   /* ----------------------------- session wiring ----------------------------- */
 
