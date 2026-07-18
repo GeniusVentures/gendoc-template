@@ -71,7 +71,7 @@ export const DRAWER_CSS = `
   .session-item:hover .session-del { opacity: 1; }
 
   .messages {
-    flex: 1; overflow-y: auto; padding: 14px;
+    flex: 1; min-width: 0; max-width: 100%; overflow-y: auto; overflow-x: hidden; padding: 14px;
     display: flex; flex-direction: column; gap: 10px;
   }
   .scroll-bottom {
@@ -218,14 +218,19 @@ export const DRAWER_CSS = `
   }
   .hint { color: var(--ask-muted-fg, #5c6b78); font-size: 12.5px; margin: auto; text-align: center; padding: 0 20px; }
 
-  form { flex: none; display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--ask-drawer-border, #e2e8ee); }
+  form {
+    flex: none; display: flex; width: 100%; min-width: 0; gap: 8px; padding: 12px;
+    border-top: 1px solid var(--ask-drawer-border, #e2e8ee);
+  }
   input {
-    flex: 1; border: 1px solid var(--ask-input-border, #d6dde3); border-radius: 8px;
+    flex: 1 1 0; width: 0; min-width: 0; max-width: 100%;
+    border: 1px solid var(--ask-input-border, #d6dde3); border-radius: 8px;
     padding: 9px 11px; font-size: 13.5px;
     background: var(--ask-input-bg, #fff); color: inherit;
     outline-color: var(--ask-accent, #2f6fed);
   }
   form button[type=submit] {
+    flex: 0 0 auto; white-space: nowrap;
     border: 0; border-radius: 8px; padding: 9px 14px;
     font-weight: 600; font-size: 13px; cursor: pointer;
     background: var(--ask-accent, #2f6fed); color: var(--ask-on-accent, #fff);
@@ -237,9 +242,12 @@ export const DRAWER_CSS = `
      over the inline saved-width style set by DrawerUI. */
   @media (max-width: 700px) {
     .drawer {
-      left: 0; right: 0; top: 0; bottom: 0;
-      width: auto !important; min-width: 0; max-width: none;
-      height: 100dvh; border-left: 0; overflow: hidden;
+      left: var(--ask-viewport-left, 0px); right: auto;
+      top: var(--ask-viewport-top, 0px); bottom: auto;
+      width: var(--ask-viewport-width, 100vw) !important;
+      height: var(--ask-viewport-height, 100dvh);
+      min-width: 0; max-width: none;
+      border-left: 0; overflow: hidden;
     }
     .drawer::before { display: none; }
     .head {
