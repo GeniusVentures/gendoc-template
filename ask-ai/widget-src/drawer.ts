@@ -132,7 +132,7 @@ export class DrawerUI
     this.drawer.classList.add("open");
     // Opening a drawer should not immediately raise the software keyboard on
     // phones.  It also avoids iOS Safari scrolling a fixed panel to the input.
-    if (!window.matchMedia("(max-width: 700px)").matches)
+    if (!window.matchMedia("(max-width: 768px)").matches)
     {
       this.inputEl.focus();
     }
@@ -184,7 +184,7 @@ export class DrawerUI
       "--ask-viewport-top",
       "--ask-viewport-height",
     ];
-    if (!window.matchMedia("(max-width: 700px)").matches)
+    if (!window.matchMedia("(max-width: 768px)").matches)
     {
       for (const property of properties)
       {
@@ -200,7 +200,7 @@ export class DrawerUI
 
   private lockMobilePage(): void
   {
-    if (this.pageLock || !window.matchMedia("(max-width: 700px)").matches)
+    if (this.pageLock || !window.matchMedia("(max-width: 768px)").matches)
     {
       return;
     }
