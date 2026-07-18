@@ -181,7 +181,7 @@
    Material's desktop-oriented width and margin rules must not create a
    horizontal layout viewport on phones. Long product identifiers and wide
    Markdown elements should wrap or scroll inside the content column. */
-@media screen and (max-width: 44em) {
+@media screen and (max-width: 48em) {
     html,
     body,
     .md-container,
@@ -198,6 +198,7 @@
     html,
     body {
         overflow-x: hidden;
+        overflow-x: clip;
     }
 
     .md-main__inner {
@@ -240,6 +241,17 @@
     .md-typeset table {
         max-width: 100%;
         overflow-x: auto;
+    }
+
+    /* iOS zooms the visual viewport when a focused form control renders below
+       16px. The Ask input is protected inside its Shadow DOM; this covers the
+       normal document and MkDocs Material search UI without disabling pinch
+       zoom in the viewport meta tag. */
+    input,
+    textarea,
+    select,
+    .md-search__input {
+        font-size: 16px !important;
     }
 }
 
