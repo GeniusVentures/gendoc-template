@@ -232,6 +232,34 @@ export const DRAWER_CSS = `
   }
   form button[type=submit]:disabled { opacity: .5; }
 
+  /* On phones, a width saved while using the desktop resizer must never push
+     the fixed drawer beyond the visual viewport.  The important width wins
+     over the inline saved-width style set by DrawerUI. */
+  @media (max-width: 700px) {
+    .drawer {
+      width: 100vw !important; min-width: 0; max-width: 100vw;
+      height: 100dvh; border-left: 0;
+    }
+    .drawer::before { display: none; }
+    .head {
+      padding-left: max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
+    }
+    .messages {
+      padding-left: max(14px, env(safe-area-inset-left));
+      padding-right: max(14px, env(safe-area-inset-right));
+    }
+    form {
+      padding-left: max(12px, env(safe-area-inset-left));
+      padding-right: max(12px, env(safe-area-inset-right));
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+    }
+    .fab {
+      right: max(16px, env(safe-area-inset-right));
+      bottom: max(16px, env(safe-area-inset-bottom));
+    }
+  }
+
   /* Dark theme — synced via data-theme attribute from Material MkDocs toggle */
   .drawer[data-theme="dark"] {
     --ask-drawer-bg: var(--ask-dark-bg, #1a2129);
