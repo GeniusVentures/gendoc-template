@@ -24,6 +24,11 @@ export class DrawerUI
   private readonly messageEls: HTMLElement[] = [];
   private activeTranscript: Transcript | null = null;
   private onStop: (() => void) | null = null;
+  private pageLock: {
+    scrollY: number;
+    bodyStyle: string | null;
+    rootStyle: string | null;
+  } | null = null;
 
   constructor(
     private readonly config: AskConfig,
@@ -53,7 +58,6 @@ export class DrawerUI
     // Track its exact box so the header and composer both remain visible.
     this.syncVisualViewport();
     window.addEventListener("resize", this.syncVisualViewport);
-    window.addEventListener("scroll", this.syncVisualViewport, { passive: true });
     window.visualViewport?.addEventListener("resize", this.syncVisualViewport);
     window.visualViewport?.addEventListener("scroll", this.syncVisualViewport);
 
@@ -123,6 +127,7 @@ export class DrawerUI
 
   open(): void
   {
+    this.lockMobilePage();
     this.syncVisualViewport();
     this.drawer.classList.add("open");
     // Opening a drawer should not immediately raise the software keyboard on
@@ -140,7 +145,9 @@ export class DrawerUI
 
   close(): void
   {
+    this.inputEl.blur();
     this.drawer.classList.remove("open");
+    this.unlockMobilePage();
   }
 
   setBusy(busy: boolean): void
@@ -174,9 +181,7 @@ export class DrawerUI
   private readonly syncVisualViewport = (): void =>
   {
     const properties = [
-      "--ask-viewport-left",
       "--ask-viewport-top",
-      "--ask-viewport-width",
       "--ask-viewport-height",
     ];
     if (!window.matchMedia("(max-width: 700px)").matches)
@@ -189,15 +194,64 @@ export class DrawerUI
     }
 
     const viewport = window.visualViewport;
-    // The mobile drawer is absolute rather than fixed. pageLeft/pageTop place
-    // it at the visual viewport's document coordinates; normal page scrolling
-    // then subtracts that same offset on screen. This avoids double-applying
-    // iOS keyboard and horizontal-scroll offsets to a fixed element.
-    this.drawer.style.setProperty("--ask-viewport-left", `${viewport?.pageLeft ?? window.scrollX}px`);
-    this.drawer.style.setProperty("--ask-viewport-top", `${viewport?.pageTop ?? window.scrollY}px`);
-    this.drawer.style.setProperty("--ask-viewport-width", `${viewport?.width ?? window.innerWidth}px`);
+    this.drawer.style.setProperty("--ask-viewport-top", `${Math.max(0, viewport?.offsetTop ?? 0)}px`);
     this.drawer.style.setProperty("--ask-viewport-height", `${viewport?.height ?? window.innerHeight}px`);
   };
+
+  private lockMobilePage(): void
+  {
+    if (this.pageLock || !window.matchMedia("(max-width: 700px)").matches)
+    {
+      return;
+    }
+
+    const root = document.documentElement;
+    const body = document.body;
+    const scrollY = window.scrollY;
+    this.pageLock = {
+      scrollY,
+      bodyStyle: body.getAttribute("style"),
+      rootStyle: root.getAttribute("style"),
+    };
+
+    // A fixed body prevents iOS from panning the document canvas when the
+    // software keyboard focuses the drawer input. Horizontal position is
+    // deliberately normalized to zero because mobile content is width-bound.
+    root.style.overflow = "hidden";
+    root.style.width = "100%";
+    body.style.position = "fixed";
+    body.style.top = `${-scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+    window.scrollTo(0, 0);
+  }
+
+  private unlockMobilePage(): void
+  {
+    const lock = this.pageLock;
+    if (!lock)
+    {
+      return;
+    }
+    this.pageLock = null;
+
+    restoreStyleAttribute(document.body, lock.bodyStyle);
+    restoreStyleAttribute(document.documentElement, lock.rootStyle);
+
+    const restorePosition = (): void => window.scrollTo(0, lock.scrollY);
+    restorePosition();
+    requestAnimationFrame(restorePosition);
+    // iOS may apply one final viewport pan as the keyboard dismissal finishes.
+    window.setTimeout(() =>
+    {
+      if (!this.drawer.classList.contains("open"))
+      {
+        restorePosition();
+      }
+    }, 350);
+  }
 
   /* ----------------------------- session wiring ----------------------------- */
 
@@ -563,6 +617,18 @@ export class DrawerUI
 }
 
 /* ---------------------------------- helpers ---------------------------------- */
+
+function restoreStyleAttribute(element: HTMLElement, value: string | null): void
+{
+  if (value === null)
+  {
+    element.removeAttribute("style");
+  }
+  else
+  {
+    element.setAttribute("style", value);
+  }
+}
 
 function buildSourceList(sources: readonly { title: string; url: string }[]): HTMLElement
 {
