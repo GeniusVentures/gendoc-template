@@ -237,8 +237,9 @@ export const DRAWER_CSS = `
      over the inline saved-width style set by DrawerUI. */
   @media (max-width: 700px) {
     .drawer {
-      width: 100vw !important; min-width: 0; max-width: 100vw;
-      height: 100dvh; border-left: 0;
+      left: 0; right: 0; top: 0; bottom: 0;
+      width: auto !important; min-width: 0; max-width: none;
+      height: 100dvh; border-left: 0; overflow: hidden;
     }
     .drawer::before { display: none; }
     .head {
@@ -254,6 +255,7 @@ export const DRAWER_CSS = `
       padding-right: max(12px, env(safe-area-inset-right));
       padding-bottom: max(12px, env(safe-area-inset-bottom));
     }
+    input { font-size: 16px; }
     .fab {
       right: max(16px, env(safe-area-inset-right));
       bottom: max(16px, env(safe-area-inset-bottom));
