@@ -94,7 +94,7 @@ install_doxybook2() {
 
     # ── Extract ───────────────────────────────────────────────────────────────
     echo "  Extracting..."
-    if ! unzip -o "${zip_path}" -d "${tmp_dir}" >/dev/null; then
+    if ! unzip -o "${zip_path}" -d "${tmp_dir}"; then
         echo "Error: failed to unzip ${zip_path}" >&2
         rm -rf "${tmp_dir}"
         exit 1
