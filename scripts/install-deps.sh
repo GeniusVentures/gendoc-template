@@ -107,11 +107,10 @@ install_doxybook2() {
     fi
 
     # ── Find the binary in the extracted contents ────────────────────────────
-    local binary_path
-    binary_path=$(find "${tmp_dir}" -type f -name "doxybook2" -perm +111 2>/dev/null | head -1)
-    if [ -z "${binary_path}" ]; then
-        # Fallback: look for doxybook2 anywhere in the extracted tree
-        binary_path=$(find "${tmp_dir}" -type f -name "doxybook2" 2>/dev/null | head -1)
+    local binary_path="${tmp_dir}/bin/doxybook2"
+    if [ ! -f "${binary_path}" ]; then
+        # Fallback for archives that place the binary in a different directory.
+        binary_path=$(find "${tmp_dir}" -type f -name "doxybook2" -print -quit 2>/dev/null || true)
         if [ -z "${binary_path}" ]; then
             echo "Error: doxybook2 binary not found in extracted archive" >&2
             echo "       Contents of ${tmp_dir}:" >&2
