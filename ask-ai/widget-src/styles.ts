@@ -252,7 +252,7 @@ export const DRAWER_CSS = `
   /* On phones, a width saved while using the desktop resizer must never push
      the fixed drawer beyond the visual viewport.  The important width wins
      over the inline saved-width style set by DrawerUI. */
-  @media (max-width: 700px) {
+  @media (max-width: 768px) {
     .drawer {
       position: fixed;
       left: 0; right: 0;
@@ -278,7 +278,7 @@ export const DRAWER_CSS = `
       padding-right: max(12px, env(safe-area-inset-right));
       padding-bottom: max(12px, env(safe-area-inset-bottom));
     }
-    input { font-size: 16px; }
+    input { font-size: 16px !important; touch-action: manipulation; }
     .fab {
       right: max(16px, env(safe-area-inset-right));
       bottom: max(16px, env(safe-area-inset-bottom));
