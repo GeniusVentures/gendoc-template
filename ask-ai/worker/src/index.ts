@@ -56,8 +56,8 @@ function normalizedPath(value: string, origin: string): string | null {
     const site = new URL(origin);
     const url = new URL(value, site);
     if (url.origin !== site.origin) return null;
-    const path = url.pathname.replace(/\\/index\\.html$/i, '/');
-    return path.length > 1 ? path.replace(/\\/+$/, '') : path;
+    const path = url.pathname.replace(/\/index\.html$/i, '/');
+    return path.length > 1 ? path.replace(/\/+$/, '') : path;
   } catch {
     return null;
   }
