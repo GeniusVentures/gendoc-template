@@ -91,7 +91,7 @@ jobs:
 
       - name: Build documentation
         run: >-
-          mkdocs build
+          properdocs build
           --config-file gendoc-template/mkdocs.yml
           --site-dir "$GITHUB_WORKSPACE/site-${{ matrix.theme }}"
 

@@ -16,7 +16,7 @@ fi
 export PATH="$VENV/bin:$PATH"
 
 # Install/refresh required packages.
-pip install --quiet mkdocs mkdocs-material mkdocs-literate-nav pyyaml
+pip install --quiet properdocs mkdocs-material mkdocs-literate-nav pyyaml
 
 if [ ! -f "$GENDOC_YML" ]; then
     echo "Error: gendoc.yml not found at $GENDOC_YML" >&2
@@ -42,24 +42,27 @@ if ! wrangler whoami &>/dev/null; then
     echo ""
 fi
 
-# ── Read gendoc.yml values ───────────────────────────────────────────────────
+# ── Read gendoc.yml values (single Python call) ───────────────────────────────
 echo "Reading gendoc.yml..."
 
-read_yaml() {
-    python3 "$SCRIPT_DIR/read-yaml.py" "$GENDOC_YML" "$1"
-}
-
-# Like read_yaml, but joins a YAML list into a comma-separated string.
-read_yaml_list() {
-    python3 "$SCRIPT_DIR/read-yaml.py" "$GENDOC_YML" "$1" --join
-}
-
-PROJECT_NAME=$(read_yaml "project.name")
-PAGES_PROJECT_NAME=$(read_yaml "deploy.cloudflare.pages_project_name")
-PRODUCTION_BRANCH=$(read_yaml "deploy.cloudflare.production_branch")
-CUSTOM_DOMAIN=$(read_yaml "deploy.cloudflare.custom_domain")
-COMPATIBILITY_DATE=$(read_yaml "deploy.cloudflare.compatibility_date")
-SITE_DIR=$(read_yaml "mkdocs.site_dir")
+eval "$(python3 "$SCRIPT_DIR/read-yaml.py" "$GENDOC_YML" --batch \
+    "project.name=PROJECT_NAME" \
+    "deploy.cloudflare.pages_project_name=PAGES_PROJECT_NAME" \
+    "deploy.cloudflare.production_branch=PRODUCTION_BRANCH" \
+    "deploy.cloudflare.custom_domain=CUSTOM_DOMAIN" \
+    "deploy.cloudflare.compatibility_date=COMPATIBILITY_DATE" \
+    "mkdocs.site_dir=SITE_DIR" \
+    "llms.enabled=LLMS_ENABLED" \
+    "llms.ask.enabled=ASK_ENABLED" \
+    "llms.site_url=LLMS_SITE_URL" \
+    "llms.ask.worker_name=ASK_WORKER_NAME" \
+    "llms.ask.title=ASK_BOT_NAME" \
+    "llms.ask.allowed_origins=ASK_ORIGINS:join" \
+    "llms.ask.providers=ASK_PROVIDERS" \
+    "llms.ask.gemini_model=ASK_GEMINI_MODEL" \
+    "llms.ask.openrouter_models=ASK_OPENROUTER_MODELS" \
+    "llms.ask.endpoint=ASK_ENDPOINT_CFG" \
+)"
 
 if [ -z "$PAGES_PROJECT_NAME" ]; then
     echo "Error: deploy.cloudflare.pages_project_name is required in gendoc.yml" >&2
@@ -124,25 +127,14 @@ with open(sys.argv[5], 'w') as f:
 echo "  wrangler.toml written to $WRANGLER_OUT"
 
 # ── Ask widget worker (optional) ─────────────────────────────────────────────
-LLMS_ENABLED=$(read_yaml "llms.enabled")
-ASK_ENABLED=$(read_yaml "llms.ask.enabled")
-ASK_WORKER_NAME=""
-
 if [ "$LLMS_ENABLED" = "true" ] && [ "$ASK_ENABLED" = "true" ]; then
-    LLMS_SITE_URL="$(read_yaml "llms.site_url")"
     LLMS_SITE_URL="${LLMS_SITE_URL%/}"
 
-    ASK_WORKER_NAME=$(read_yaml "llms.ask.worker_name")
     ASK_WORKER_NAME="${ASK_WORKER_NAME:-${PAGES_PROJECT_NAME}-ask}"
-    ASK_BOT_NAME=$(read_yaml "llms.ask.title")
     ASK_BOT_NAME="${ASK_BOT_NAME:-${PROJECT_NAME:-Docs} Assistant}"
-    ASK_ORIGINS=$(read_yaml_list "llms.ask.allowed_origins")
     ASK_ORIGINS="${ASK_ORIGINS:-$LLMS_SITE_URL}"
-    ASK_PROVIDERS=$(read_yaml "llms.ask.providers")
     ASK_PROVIDERS="${ASK_PROVIDERS:-openrouter,gemini}"
-    ASK_GEMINI_MODEL=$(read_yaml "llms.ask.gemini_model")
     ASK_GEMINI_MODEL="${ASK_GEMINI_MODEL:-gemini-2.5-flash}"
-    ASK_OPENROUTER_MODELS=$(read_yaml "llms.ask.openrouter_models")
     ASK_OPENROUTER_MODELS="${ASK_OPENROUTER_MODELS:-nvidia/nemotron-3-super-120b-a12b:free,nvidia/nemotron-3-ultra-550b-a55b:free,nvidia/nemotron-3-nano-30b-a3b:free}"
 
     ASK_TPL="$TEMPLATE_ROOT/ask-ai/wrangler-ask.toml.template"
@@ -151,8 +143,8 @@ if [ "$LLMS_ENABLED" = "true" ] && [ "$ASK_ENABLED" = "true" ]; then
     echo ""
     echo "Generating ask-ai/wrangler-ask.toml from template..."
 
-    # Read configured endpoint for route injection (shared-worker scenario).
-    ASK_ENDPOINT_CFG=$(read_yaml "llms.ask.endpoint")
+    # Use configured endpoint for route injection (shared-worker scenario).
+    # (ASK_ENDPOINT_CFG already set by batch read above.)
 
     python3 -c "
 import sys
@@ -200,7 +192,8 @@ with open(sys.argv[9], 'w') as f:
     # Resolve the endpoint so build-widget.sh can generate ask-config.json.
     # Precedence: configured llms.ask.endpoint (shared-worker / custom-domain
     # scenario), otherwise auto-capture the workers.dev URL from deploy output.
-    CONFIGURED_ENDPOINT=$(read_yaml "llms.ask.endpoint")
+    # Use configured endpoint from batch read above.
+    CONFIGURED_ENDPOINT="$ASK_ENDPOINT_CFG"
     ENDPOINT_FILE="$TEMPLATE_ROOT/ask-ai/.endpoint"
     if [ -n "$CONFIGURED_ENDPOINT" ]; then
         echo "$CONFIGURED_ENDPOINT" > "$ENDPOINT_FILE"

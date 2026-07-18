@@ -109,12 +109,12 @@ fi
 # ── generate ask-config.local.json → local worker ─────────────────────────────
 # The widget looks for this file first on localhost; falls back to
 # ask-config.json when absent (e.g. testing against remote worker).
-read_yaml() {
-    python3 "$SCRIPT_DIR/read-yaml.py" "$HOST_ROOT/gendoc.yml" "$1"
-}
-ASK_TITLE=$(read_yaml "llms.ask.title")
+# ── Read gendoc.yml values (single Python call) ────────────────────────────────
+eval "$(python3 "$SCRIPT_DIR/read-yaml.py" "$HOST_ROOT/gendoc.yml" --batch \
+    "llms.ask.title=ASK_TITLE" \
+    "llms.ask.placeholder=ASK_PLACEHOLDER" \
+)"
 ASK_TITLE="${ASK_TITLE:-Ask}"
-ASK_PLACEHOLDER=$(read_yaml "llms.ask.placeholder")
 ASK_PLACEHOLDER="${ASK_PLACEHOLDER:-Ask a question...}"
 
 cat > "$LOCAL_CONFIG" <<EOF

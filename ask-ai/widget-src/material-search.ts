@@ -19,8 +19,8 @@ const SEARCH_TOGGLE_SELECTOR = "#__search";
 const HOOKED_ATTRIBUTE = "data-ask-hooked";
 
 export interface SearchHookTarget {
-  /** Open the drawer and ask the given question. */
-  askFromSearch(question: string): void;
+    /** Open the drawer and ask the given question. */
+    askFromSearch(question: string): void;
 }
 
 /**
@@ -30,43 +30,43 @@ export interface SearchHookTarget {
  * with them.
  */
 export function installMaterialSearchHook(title: string, target: SearchHookTarget): void {
-  try {
-    const input = document.querySelector<HTMLInputElement>(SEARCH_INPUT_SELECTOR);
-    const options = document.querySelector<HTMLElement>(SEARCH_OPTIONS_SELECTOR);
-    if (!input || !options) return;
-    if (input.hasAttribute(HOOKED_ATTRIBUTE)) return;
-    input.setAttribute(HOOKED_ATTRIBUTE, "");
+    try {
+        const input = document.querySelector<HTMLInputElement>(SEARCH_INPUT_SELECTOR);
+        const options = document.querySelector<HTMLElement>(SEARCH_OPTIONS_SELECTOR);
+        if (!input || !options) return;
+        if (input.hasAttribute(HOOKED_ATTRIBUTE)) return;
+        input.setAttribute(HOOKED_ATTRIBUTE, "");
 
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "md-search__ask";
-    const icon = getComputedStyle(document.documentElement).getPropertyValue('--ask-icon').trim() || '💬';
-    btn.textContent = `${icon} ${title}`;
-    btn.title = `${title}: ask a question about the docs`;
-    // Inline styles to keep this self-contained — no stylesheet dependency.
-    btn.style.cssText =
-      "margin:0;padding:0 .5rem;cursor:pointer;background:none;border:0;" +
-      "font-size:.7rem;font-weight:600;line-height:1;white-space:nowrap;" +
-      "color:var(--md-accent-fg-color,#2f6fed);position:relative;z-index:9999;pointer-events:auto";
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "md-search__ask";
+        const icon = getComputedStyle(document.documentElement).getPropertyValue("--ask-icon").trim() || "💬";
+        btn.textContent = `${icon} ${title}`;
+        btn.title = `${title}: ask a question about the docs`;
+        // Inline styles to keep this self-contained — no stylesheet dependency.
+        btn.style.cssText =
+            "margin:0;padding:0 .5rem;cursor:pointer;background:none;border:0;" +
+            "font-size:.7rem;font-weight:600;line-height:1;white-space:nowrap;" +
+            "color:var(--md-accent-fg-color,#2f6fed);position:relative;z-index:9999;pointer-events:auto";
 
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      const query = input.value.trim();
-      closeMaterialSearch(input);
-      // Defer so Material's focus-restore handlers don't steal focus
-      // back from the drawer input.
-      setTimeout(() => target.askFromSearch(query), 0);
-    });
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const query = input.value.trim();
+            closeMaterialSearch(input);
+            // Defer so Material's focus-restore handlers don't steal focus
+            // back from the drawer input.
+            setTimeout(() => target.askFromSearch(query), 0);
+        });
 
-    options.appendChild(btn);
-  } catch (error) {
-    console.warn("[ask-widget] search integration skipped:", error);
-  }
+        options.appendChild(btn);
+    } catch (error) {
+        console.warn("[ask-widget] search integration skipped:", error);
+    }
 }
 
 function closeMaterialSearch(input: HTMLInputElement): void {
-  const toggle = document.querySelector<HTMLInputElement>(SEARCH_TOGGLE_SELECTOR);
-  if (toggle) toggle.checked = false;
-  input.blur();
+    const toggle = document.querySelector<HTMLInputElement>(SEARCH_TOGGLE_SELECTOR);
+    if (toggle) toggle.checked = false;
+    input.blur();
 }

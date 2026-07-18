@@ -105,13 +105,13 @@
 
     .md-sidebar--primary {
         padding-top: 0 !important;
-        padding-bottom: 2.5rem !important;
+        padding-bottom: 4rem !important;
         overflow: hidden !important;
         overscroll-behavior: contain !important;
     }
 
     .md-sidebar--primary .md-sidebar__scrollwrap {
-        width: 100% !important;
+        width: calc(100% - 0.5rem) !important;
         overflow-y: auto !important;
         overflow-x: hidden !important;
         overscroll-behavior: contain !important;

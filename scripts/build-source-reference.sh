@@ -54,22 +54,24 @@ fi
 # ── Read gendoc.yml values ────────────────────────────────────────────────────
 echo "Reading gendoc.yml..."
 
-read_yaml() {
-    python3 "$SCRIPT_DIR/read-yaml.py" "$GENDOC_YML" "$1"
-}
+eval "$(python3 "$SCRIPT_DIR/read-yaml.py" "$GENDOC_YML" --batch \
+    "project.name=PROJECT_NAME" \
+    "project.number=PROJECT_NUMBER" \
+    "project.brief=PROJECT_BRIEF" \
+    "project.logo=PROJECT_LOGO" \
+    "paths.handwritten_docs=HANDWRITTEN_DOCS" \
+    "paths.exclude_patterns=EXCLUDE_PATTERNS_RAW:join-space" \
+    "doxygen.output_dir=DOXY_OUTPUT_DIR" \
+    "doxygen.generate_xml=GENERATE_XML_RAW" \
+    "doxygen.generate_html=GENERATE_HTML_RAW" \
+    "doxygen.recursive=RECURSIVE_RAW" \
+    "doxygen.strip_from_path=STRIP_FROM_PATH" \
+    "doxygen.full_path_names=FULL_PATH_NAMES_RAW" \
+)"
 
-PROJECT_NAME=$(read_yaml "project.name")
-PROJECT_NUMBER=$(read_yaml "project.number")
-PROJECT_BRIEF=$(read_yaml "project.brief")
-PROJECT_LOGO=$(read_yaml "project.logo")
-HANDWRITTEN_DOCS=$(read_yaml "paths.handwritten_docs")
-EXCLUDE_PATTERNS_RAW=$(read_yaml "paths.exclude_patterns" --join-space)
-DOXY_OUTPUT_DIR=$(read_yaml "doxygen.output_dir")
-GENERATE_XML_RAW=$(read_yaml "doxygen.generate_xml")
-GENERATE_HTML_RAW=$(read_yaml "doxygen.generate_html")
-RECURSIVE_RAW=$(read_yaml "doxygen.recursive")
-STRIP_FROM_PATH=$(read_yaml "doxygen.strip_from_path")
-FULL_PATH_NAMES_RAW=$(read_yaml "doxygen.full_path_names")
+if [ -z "$EXCLUDE_PATTERNS_RAW" ]; then
+    EXCLUDE_PATTERNS_RAW=""
+fi
 
 # ── Validate required values ──────────────────────────────────────────────────
 if [ -z "$PROJECT_NAME" ]; then
