@@ -418,3 +418,164 @@ export class DrawerUI
   }
 
   private patchMessage(index: number): void
+  {
+    const transcript = this.activeTranscript;
+    if (!transcript)
+    {
+      return;
+    }
+    const message = transcript.all[index];
+    const element = this.messageEls[index];
+    if (!message || !element)
+    {
+      return;
+    }
+
+    element.className = `message ${message.role}`;
+    const body = element.querySelector(".body") as HTMLElement;
+    if (message.role === "user")
+    {
+      body.textContent = message.text;
+    }
+    else
+    {
+      // Render "Thinking..." collapsible if the model streamed reasoning
+      let thinkEl = element.querySelector(".thinking") as HTMLDetailsElement | null;
+      if (message.thinking)
+      {
+        if (!thinkEl)
+        {
+          thinkEl = document.createElement("details");
+          thinkEl.className = "thinking";
+          thinkEl.open = false;
+          const summary = document.createElement("summary");
+          summary.textContent = "Thinking…";
+          thinkEl.appendChild(summary);
+          const pre = document.createElement("pre");
+          thinkEl.appendChild(pre);
+          element.insertBefore(thinkEl, body);
+        }
+        (thinkEl.lastElementChild as HTMLElement).textContent = message.thinking;
+        // Animate "Thinking…" dots while answer hasn't started
+        thinkEl.classList.toggle('streaming', !message.text || message.text === '…');
+      }
+      else if (thinkEl)
+      {
+        thinkEl.remove();
+      }
+      // Provider badge
+      let providerEl = element.querySelector(".provider") as HTMLElement | null;
+      if (message.provider)
+      {
+        if (!providerEl)
+        {
+          providerEl = document.createElement("span");
+          providerEl.className = "provider";
+          element.insertBefore(providerEl, body);
+        }
+        providerEl.textContent = message.provider;
+      }
+      else if (providerEl)
+      {
+        providerEl.remove();
+      }
+      body.innerHTML = renderMarkdown(message.text || "…");
+      highlightCodeBlocks(body);
+    }
+
+    element.querySelector(".sources")?.remove();
+    if (message.sources.length > 0)
+    {
+      element.appendChild(buildSourceList(message.sources));
+    }
+
+    // Auto-scroll: if user is near the bottom, follow new content down
+    const scrollBottom = this.messagesEl.scrollHeight - this.messagesEl.scrollTop - this.messagesEl.clientHeight;
+    if (scrollBottom < 80)
+    {
+      this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+    }
+    else
+    {
+      this.scrollBottomEl.style.display = "";
+    }
+  }
+
+  private syncScrollButton(): void
+  {
+    const dist = this.messagesEl.scrollHeight - this.messagesEl.scrollTop - this.messagesEl.clientHeight;
+    this.scrollBottomEl.style.display = dist > 80 ? "" : "none";
+  }
+
+  private query<T extends HTMLElement = HTMLElement>(selector: string): T
+  {
+    const element = this.root.querySelector<T>(selector);
+    if (!element)
+    {
+      throw new Error(`DrawerUI: missing element ${selector}`);
+    }
+    return element;
+  }
+
+  private escapeHtml(s: string): string
+  {
+    return s.replace(/[&<>"]/g, (c: string) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" } as Record<string, string>)[c] ?? c);
+  }
+}
+
+/* ---------------------------------- helpers ---------------------------------- */
+
+function buildSourceList(sources: readonly { title: string; url: string }[]): HTMLElement
+{
+  const details = document.createElement("details");
+  details.className = "sources";
+  const summary = document.createElement("summary");
+  summary.textContent = `Sources (${sources.length})`;
+  details.appendChild(summary);
+  for (const source of sources)
+  {
+    const anchor = document.createElement("a");
+    anchor.href = source.url;
+    anchor.target = "_blank";
+    anchor.rel = "noopener";
+    anchor.textContent = source.title || source.url;
+    details.appendChild(anchor);
+  }
+  return details;
+}
+
+/** Highlight sanitized code blocks when Highlight.js is available. */
+function highlightCodeBlocks(container: HTMLElement): void
+{
+  const highlighter = (window as any).hljs;
+  if (!highlighter || typeof highlighter.highlightElement !== "function")
+  {
+    return;
+  }
+  container.querySelectorAll<HTMLElement>("pre code").forEach((code) =>
+  {
+    try
+    {
+      highlighter.highlightElement(code);
+    }
+    catch
+    {
+      /* Unknown language or malformed block: leave the sanitized code plain. */
+    }
+  });
+}
+
+/** Render markdown to HTML using the marked library (loaded via CDN in mkdocs.yml). */
+function renderMarkdown(text: string): string
+{
+  const marked = (window as any).marked;
+  const purifier = (window as any).DOMPurify;
+  if (!marked || !purifier)
+  {
+    // Fail closed if either CDN dependency is unavailable.
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+  }
+  const html = marked.parse(text, { gfm: true, breaks: false }) as string;
+  return purifier.sanitize(html) as string;
+}
