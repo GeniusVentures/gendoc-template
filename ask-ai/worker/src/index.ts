@@ -50,6 +50,41 @@ function windowSlice(text: string, terms: string[], cap: number): string {
   return text.slice(start, start + cap);
 }
 
+/** Normalize a same-origin documentation path for catalog comparison. */
+function normalizedPath(value: string, origin: string): string | null {
+  try {
+    const site = new URL(origin);
+    const url = new URL(value, site);
+    if (url.origin !== site.origin) return null;
+    const path = url.pathname.replace(/\/index\.html$/i, '/');
+    return path.length > 1 ? path.replace(/\/+$/, '') : path;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A context-free question such as "what is this?" has no useful search terms.
+ * Select only a catalogued document for the current path; never accept arbitrary
+ * client-supplied content or URLs as model context.
+ */
+function currentPageEntry(
+  entries: CatalogEntry[],
+  pageUrl: string,
+  origin: string,
+): CatalogEntry | null {
+  const requestedPath = normalizedPath(pageUrl, origin);
+  if (!requestedPath) return null;
+
+  return entries.find(entry => normalizedPath(entry.url, origin) === requestedPath) || null;
+}
+
+const CATALOG_OVERVIEW: CatalogEntry = {
+  title: 'Documentation overview',
+  url: '/llms.txt',
+  desc: 'The site-provided documentation catalog and project overview.',
+};
+
 /**
  * Build fallback context when the normalizer couldn't match a word.
  * Tier 1: ED1 variant generation + title-word Set lookup (fast, O(1000) per word).
@@ -149,6 +184,7 @@ export default {
     const question = String(body.question || '').slice(0, 1000).trim();
     const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
     const searchHints = String(body.search_hints || '').slice(0, 3000).trim();
+    const pageUrl = String(body.page_url || '').slice(0, 2048).trim();
 
     if (!question) {
       return json({ error: 'empty question' }, 400, cors);
@@ -181,6 +217,15 @@ export default {
     const entries = await loadCatalog(env, origin);
     const { terms, corrections, unmatched } = await extractTerms(env, question, origin);
     let top = scoreEntries(entries, terms).slice(0, 30);
+    const isContextFreeQuestion = terms.length === 0 && unmatched.length === 0;
+    const contextEntry = isContextFreeQuestion
+      ? currentPageEntry(entries, pageUrl, origin) || CATALOG_OVERVIEW
+      : null;
+
+    // Do not use the question's stop words as retrieval terms. For contextual
+    // questions, the current page is a safe source only when it is present in
+    // llms.txt; otherwise use llms.txt itself as the approved site overview.
+    if (contextEntry) top = [contextEntry];
 
     const sse = new TransformStream();
     const writer = sse.writable.getWriter();
@@ -406,8 +451,10 @@ export default {
 
         // When hints exist, pick the first hint with a real page path (not
         // just a hash fragment) and fetch it as the PRIMARY source.
-        let primaryDoc: any = null;
-        if (searchHints) {
+        let primaryDoc: any = contextEntry
+          ? docs.find(d => d.url === contextEntry.url) || null
+          : null;
+        if (!primaryDoc && searchHints) {
           const hintLines = searchHints.split('\n');
           for (const hintLine of hintLines) {
             const hm = hintLine.match(/^- \[([^\]]+)\]\(([^)]+)\)/);

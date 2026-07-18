@@ -115,7 +115,10 @@ def _inject_cover(markdown, page):
         f'<div style="width:100%;height:450px;overflow:hidden;'
         f'max-width:calc(100% + 3.2rem);">'
         f'<img src="{cover_path}" '
-        f'style="width:100%;height:100%;object-fit:cover;object-position:center {y_pct}%;" '
+        # GitBook cover artwork often contains logos or text near its edges.
+        # "cover" cropped that content whenever the viewport aspect ratio did
+        # not match the source image; "contain" preserves the complete image.
+        f'style="width:100%;height:100%;object-fit:contain;object-position:center {y_pct}%;" '
         f'alt="cover">'
         f'</div>\n\n'
     )

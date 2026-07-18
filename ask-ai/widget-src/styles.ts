@@ -5,7 +5,15 @@
  * Shadow DOM inherits custom properties from the light DOM automatically.
  */
 export const DRAWER_CSS = `
-  :host { all: initial; }
+  :host {
+    all: initial;
+    position: fixed;
+    inset: 0;
+    width: 0;
+    height: 0;
+    overflow: visible;
+    z-index: 9998;
+  }
   * { box-sizing: border-box; font-family: var(--ask-font, system-ui, -apple-system, "Segoe UI", sans-serif); }
 
   .fab {
@@ -71,8 +79,9 @@ export const DRAWER_CSS = `
   .session-item:hover .session-del { opacity: 1; }
 
   .messages {
-    flex: 1; overflow-y: auto; padding: 14px;
+    flex: 1; min-width: 0; max-width: 100%; overflow-y: auto; overflow-x: hidden; padding: 14px;
     display: flex; flex-direction: column; gap: 10px;
+    overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
   }
   .scroll-bottom {
     position: absolute; bottom: 60px; right: 20px; z-index: 10;
@@ -216,21 +225,65 @@ export const DRAWER_CSS = `
     text-transform: uppercase; letter-spacing: .5px;
     margin: 0 0 4px 0;
   }
-  .hint { color: var(--ask-muted-fg, #5c6b78); font-size: 12.5px; margin: auto; text-align: center; padding: 0 20px; }
+  .hint {
+    max-width: 100%; overflow-wrap: anywhere;
+    color: var(--ask-muted-fg, #5c6b78); font-size: 12.5px; margin: auto; text-align: center; padding: 0 20px;
+  }
 
-  form { flex: none; display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--ask-drawer-border, #e2e8ee); }
+  form {
+    flex: none; display: flex; width: 100%; min-width: 0; gap: 8px; padding: 12px;
+    border-top: 1px solid var(--ask-drawer-border, #e2e8ee);
+  }
   input {
-    flex: 1; border: 1px solid var(--ask-input-border, #d6dde3); border-radius: 8px;
+    flex: 1 1 0; width: 0; min-width: 0; max-width: 100%;
+    border: 1px solid var(--ask-input-border, #d6dde3); border-radius: 8px;
     padding: 9px 11px; font-size: 13.5px;
     background: var(--ask-input-bg, #fff); color: inherit;
     outline-color: var(--ask-accent, #2f6fed);
   }
   form button[type=submit] {
+    flex: 0 0 auto; white-space: nowrap;
     border: 0; border-radius: 8px; padding: 9px 14px;
     font-weight: 600; font-size: 13px; cursor: pointer;
     background: var(--ask-accent, #2f6fed); color: var(--ask-on-accent, #fff);
   }
   form button[type=submit]:disabled { opacity: .5; }
+
+  /* On phones, a width saved while using the desktop resizer must never push
+     the fixed drawer beyond the visual viewport.  The important width wins
+     over the inline saved-width style set by DrawerUI. */
+  @media (max-width: 768px) {
+    .drawer {
+      position: fixed;
+      left: 0; right: 0;
+      top: var(--ask-viewport-top, 0px); bottom: auto;
+      width: 100% !important;
+      height: var(--ask-viewport-height, 100dvh);
+      min-width: 0; max-width: 100%;
+      border-left: 0; overflow: hidden;
+      contain: layout paint;
+      overscroll-behavior: none;
+    }
+    .drawer::before { display: none; }
+    .head {
+      padding-left: max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
+    }
+    .messages {
+      padding-left: max(14px, env(safe-area-inset-left));
+      padding-right: max(14px, env(safe-area-inset-right));
+    }
+    form {
+      padding-left: max(12px, env(safe-area-inset-left));
+      padding-right: max(12px, env(safe-area-inset-right));
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+    }
+    input { font-size: 16px !important; touch-action: manipulation; }
+    .fab {
+      right: max(16px, env(safe-area-inset-right));
+      bottom: max(16px, env(safe-area-inset-bottom));
+    }
+  }
 
   /* Dark theme — synced via data-theme attribute from Material MkDocs toggle */
   .drawer[data-theme="dark"] {

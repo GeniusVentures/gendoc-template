@@ -24,6 +24,11 @@ export class DrawerUI
   private readonly messageEls: HTMLElement[] = [];
   private activeTranscript: Transcript | null = null;
   private onStop: (() => void) | null = null;
+  private pageLock: {
+    scrollY: number;
+    bodyStyle: string | null;
+    rootStyle: string | null;
+  } | null = null;
 
   constructor(
     private readonly config: AskConfig,
@@ -47,6 +52,14 @@ export class DrawerUI
     this.submitEl = this.query<HTMLButtonElement>("button[type=submit]");
     this.stopEl = this.query<HTMLButtonElement>(".stop-btn");
     this.scrollBottomEl = this.query<HTMLButtonElement>(".scroll-bottom");
+
+    // On iOS the software keyboard changes the visual viewport without
+    // necessarily changing the layout viewport used by position: fixed.
+    // Track its exact box so the header and composer both remain visible.
+    this.syncVisualViewport();
+    window.addEventListener("resize", this.syncVisualViewport);
+    window.visualViewport?.addEventListener("resize", this.syncVisualViewport);
+    window.visualViewport?.addEventListener("scroll", this.syncVisualViewport);
 
     // Restore saved drawer width
     const savedWidth = localStorage.getItem('ask-drawer-width');
@@ -114,8 +127,15 @@ export class DrawerUI
 
   open(): void
   {
+    this.lockMobilePage();
+    this.syncVisualViewport();
     this.drawer.classList.add("open");
-    this.inputEl.focus();
+    // Opening a drawer should not immediately raise the software keyboard on
+    // phones.  It also avoids iOS Safari scrolling a fixed panel to the input.
+    if (!window.matchMedia("(max-width: 768px)").matches)
+    {
+      this.inputEl.focus();
+    }
     // Scroll to bottom after the CSS transition starts so dimensions are settled.
     requestAnimationFrame(() => {
       this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
@@ -125,7 +145,9 @@ export class DrawerUI
 
   close(): void
   {
+    this.inputEl.blur();
     this.drawer.classList.remove("open");
+    this.unlockMobilePage();
   }
 
   setBusy(busy: boolean): void
@@ -154,6 +176,81 @@ export class DrawerUI
   {
     const isDark = (document.body.getAttribute('data-md-color-media') || '').includes('dark');
     this.drawer.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  }
+
+  private readonly syncVisualViewport = (): void =>
+  {
+    const properties = [
+      "--ask-viewport-top",
+      "--ask-viewport-height",
+    ];
+    if (!window.matchMedia("(max-width: 768px)").matches)
+    {
+      for (const property of properties)
+      {
+        this.drawer.style.removeProperty(property);
+      }
+      return;
+    }
+
+    const viewport = window.visualViewport;
+    this.drawer.style.setProperty("--ask-viewport-top", `${Math.max(0, viewport?.offsetTop ?? 0)}px`);
+    this.drawer.style.setProperty("--ask-viewport-height", `${viewport?.height ?? window.innerHeight}px`);
+  };
+
+  private lockMobilePage(): void
+  {
+    if (this.pageLock || !window.matchMedia("(max-width: 768px)").matches)
+    {
+      return;
+    }
+
+    const root = document.documentElement;
+    const body = document.body;
+    const scrollY = window.scrollY;
+    this.pageLock = {
+      scrollY,
+      bodyStyle: body.getAttribute("style"),
+      rootStyle: root.getAttribute("style"),
+    };
+
+    // A fixed body prevents iOS from panning the document canvas when the
+    // software keyboard focuses the drawer input. Horizontal position is
+    // deliberately normalized to zero because mobile content is width-bound.
+    root.style.overflow = "hidden";
+    root.style.width = "100%";
+    body.style.position = "fixed";
+    body.style.top = `${-scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+    window.scrollTo(0, 0);
+  }
+
+  private unlockMobilePage(): void
+  {
+    const lock = this.pageLock;
+    if (!lock)
+    {
+      return;
+    }
+    this.pageLock = null;
+
+    restoreStyleAttribute(document.body, lock.bodyStyle);
+    restoreStyleAttribute(document.documentElement, lock.rootStyle);
+
+    const restorePosition = (): void => window.scrollTo(0, lock.scrollY);
+    restorePosition();
+    requestAnimationFrame(restorePosition);
+    // iOS may apply one final viewport pan as the keyboard dismissal finishes.
+    window.setTimeout(() =>
+    {
+      if (!this.drawer.classList.contains("open"))
+      {
+        restorePosition();
+      }
+    }, 350);
   }
 
   /* ----------------------------- session wiring ----------------------------- */
@@ -520,6 +617,18 @@ export class DrawerUI
 }
 
 /* ---------------------------------- helpers ---------------------------------- */
+
+function restoreStyleAttribute(element: HTMLElement, value: string | null): void
+{
+  if (value === null)
+  {
+    element.removeAttribute("style");
+  }
+  else
+  {
+    element.setAttribute("style", value);
+  }
+}
 
 function buildSourceList(sources: readonly { title: string; url: string }[]): HTMLElement
 {

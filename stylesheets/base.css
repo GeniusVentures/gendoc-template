@@ -177,6 +177,84 @@
 /* ── Content bottom margin ───────────────────────────────────────────────── */
 .md-content__inner { padding-bottom: 4rem; }
 
+/* ── Mobile width containment ──────────────────────────────────────────────
+   Material's desktop-oriented width and margin rules must not create a
+   horizontal layout viewport on phones. Long product identifiers and wide
+   Markdown elements should wrap or scroll inside the content column. */
+@media screen and (max-width: 48em) {
+    html,
+    body,
+    .md-container,
+    .md-main,
+    .md-main__inner,
+    .md-content,
+    .md-content__inner,
+    .md-typeset {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        box-sizing: border-box;
+    }
+
+    html,
+    body {
+        overflow-x: hidden;
+        overflow-x: clip;
+    }
+
+    .md-main__inner {
+        width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    .md-main__inner > .md-content {
+        width: auto !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    .md-main__inner > .md-content > .md-content__inner {
+        width: auto !important;
+        margin-left: 1rem !important;
+        margin-right: 1rem !important;
+    }
+
+    .md-typeset h1,
+    .md-typeset h2,
+    .md-typeset h3,
+    .md-typeset h4,
+    .md-typeset h5,
+    .md-typeset h6 {
+        max-width: 100%;
+        overflow-wrap: anywhere;
+        word-break: normal;
+    }
+
+    .md-typeset img,
+    .md-typeset video,
+    .md-typeset iframe {
+        max-width: 100%;
+        height: auto;
+    }
+
+    .md-typeset pre,
+    .md-typeset table {
+        max-width: 100%;
+        overflow-x: auto;
+    }
+
+    /* iOS zooms the visual viewport when a focused form control renders below
+       16px. The Ask input is protected inside its Shadow DOM; this covers the
+       normal document and MkDocs Material search UI without disabling pinch
+       zoom in the viewport meta tag. */
+    input,
+    textarea,
+    select,
+    .md-search__input {
+        font-size: 16px !important;
+    }
+}
+
 /* ── Ask AI Drawer default variables ───────────────────────────────────────
    Themes override these in themes/<name>.css.  The widget's shadow DOM
    inherits custom properties from :root automatically. */

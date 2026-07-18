@@ -210,7 +210,8 @@ build_one_set() {
     local doxyfile_out="$set_doxy_dir/Doxyfile"
     cp "$DOXYFILE_TPL" "$doxyfile_out"
 
-    sed -i '' \
+    # -i.bak works with both GNU sed (Linux) and BSD sed (macOS).
+    sed -i.bak \
         -e 's|{{PROJECT_NAME}}|'"$PROJECT_NAME"'|g' \
         -e 's|{{PROJECT_NUMBER}}|'"$PROJECT_NUMBER"'|g' \
         -e 's|{{PROJECT_BRIEF}}|'"$PROJECT_BRIEF"'|g' \
@@ -222,6 +223,7 @@ build_one_set() {
         -e 's|{{FULL_PATH_NAMES}}|'"$FULL_PATH_NAMES"'|g' \
         -e 's|{{STRIP_FROM_PATH}}|'"$STRIP_FROM_PATH"'|g' \
         "$doxyfile_out"
+    rm -f "${doxyfile_out}.bak"
 
     python3 -c "
 import sys
@@ -239,7 +241,8 @@ with open(sys.argv[1], 'w') as f:
     # ── Generate doxybook config (per-set base_url) ──────────────────────────
     local doxybook_out="$set_doxy_dir/doxybook.json"
     cp "$DOXYBOOK_JSON" "$doxybook_out"
-    sed -i '' 's|{{BASE_URL}}|'"$base_url"'|g' "$doxybook_out"
+    sed -i.bak 's|{{BASE_URL}}|'"$base_url"'|g' "$doxybook_out"
+    rm -f "${doxybook_out}.bak"
     echo "  doxybook.json written to $doxybook_out"
 
     # ── Run doxygen ──────────────────────────────────────────────────────────

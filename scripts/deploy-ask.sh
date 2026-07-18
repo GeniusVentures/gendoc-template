@@ -6,8 +6,9 @@
 # Run from the HOST PROJECT ROOT, like the other gendoc scripts:
 #   gendoc-template/scripts/deploy-ask.sh
 #
-# Requires CF_API_TOKEN and CF_ACCOUNT_ID in the environment (same as
-# deploy.sh). Secrets are set once per worker, manually:
+# For CI, set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID. The legacy
+# CF_API_TOKEN and CF_ACCOUNT_ID aliases remain supported for local scripts.
+# Provider secrets are set once per worker, manually:
 #   wrangler secret put GEMINI_API_KEY     --name <worker-name>
 #   wrangler secret put OPENROUTER_API_KEY --name <worker-name>
 set -euo pipefail
@@ -15,6 +16,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG="${1:-gendoc.yml}"
+
+# Use the same credential names as the Pages deploy workflow. Preserve the
+# short aliases for existing local automation.
+CF_API_TOKEN="${CLOUDFLARE_API_TOKEN:-${CF_API_TOKEN:-}}"
+CF_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-${CF_ACCOUNT_ID:-}}"
 
 # ── Activate Python virtual environment ────────────────────────────────────────
 VENV="$TEMPLATE_ROOT/.venv"
@@ -29,8 +35,8 @@ command -v wrangler >/dev/null 2>&1 || { echo "ERROR: wrangler not found (npm in
 if wrangler whoami >/dev/null 2>&1; then
     USE_TOKEN_AUTH=false
 else
-    : "${CF_API_TOKEN:?ERROR: CF_API_TOKEN environment variable is not set (or run: wrangler login)}"
-    : "${CF_ACCOUNT_ID:?ERROR: CF_ACCOUNT_ID environment variable is not set (or run: wrangler login)}"
+    : "${CF_API_TOKEN:?ERROR: CLOUDFLARE_API_TOKEN environment variable is not set (or run: wrangler login)}"
+    : "${CF_ACCOUNT_ID:?ERROR: CLOUDFLARE_ACCOUNT_ID environment variable is not set (or run: wrangler login)}"
     USE_TOKEN_AUTH=true
 fi
 

@@ -443,7 +443,8 @@ gendoc-template/scripts/deploy.sh
 ```
 
 The script deploys the built site to Cloudflare Pages and prints the deployed URL
-(typically `https://<project-name>.pages.dev`).
+(typically `https://<project-name>.pages.dev`). Use `deploy-ask.sh` separately
+when you need to deploy only the Ask AI Worker.
 
 ### GitHub Actions
 
@@ -451,8 +452,11 @@ This repository's `.github/workflows/build.yml` validates every built-in theme, 
 the Python hooks, and typechecks the Ask AI worker on pull requests and pushes to `develop`
 or `main`.
 
-Parent projects can call the reusable `.github/workflows/deploy.yml` workflow. Add this
-small wrapper to the parent repository as `.github/workflows/deploy.yml`:
+Parent projects can call the reusable `.github/workflows/deploy.yml` workflow. It deploys
+the Ask AI Worker first when `llms.ask.enabled` is true and the project owns its Worker,
+then builds and deploys Pages. A configured `llms.ask.endpoint` is treated as a shared or
+externally managed Worker and is left untouched unless `llms.ask.deploy_worker: true`.
+Add this small wrapper to the parent repository as `.github/workflows/deploy.yml`:
 
 ```yaml
 name: Deploy documentation
@@ -474,8 +478,11 @@ jobs:
 
 The parent repository must contain `gendoc.yml` at its root and the template as a direct
 child (normally the `gendoc-template` submodule). Add `CLOUDFLARE_API_TOKEN` and
-`CLOUDFLARE_ACCOUNT_ID` as GitHub Actions secrets. Pin the reusable workflow to a release
-tag or commit SHA for production once the desired template version is released.
+`CLOUDFLARE_ACCOUNT_ID` as GitHub Actions secrets. The API token needs Cloudflare Pages
+Edit and Workers Scripts Edit permissions; if `llms.ask.endpoint` creates a custom-domain
+route, also grant the relevant zone's Workers Routes Edit permission. Provider API keys
+remain Cloudflare Worker secrets, not GitHub secrets. Pin the reusable workflow to a
+release tag or commit SHA for production once the desired template version is released.
 
 ## Host Project .gitignore
 

@@ -96,3 +96,15 @@ with open(sys.argv[5], 'w') as f:
 " "$ASK_ENDPOINT" "$ASK_TITLE" "$ASK_PLACEHOLDER" "$LLMS_FULL_URL" "$SITE_DIR_ABS/ask-config.json"
 
 echo "  Wrote $SITE_DIR_ABS/ask-config.json"
+
+# Cloudflare Pages otherwise may keep unchanged module URLs in a browser cache
+# after a deployment. The widget is compiled on every build, so require
+# revalidation for its module graph and runtime configuration.
+cat >> "$SITE_DIR_ABS/_headers" <<'HEADERS'
+
+/javascripts/ask/*
+  Cache-Control: no-cache, must-revalidate
+/ask-config.json
+  Cache-Control: no-cache, must-revalidate
+HEADERS
+echo "  Wrote Ask widget cache rules to $SITE_DIR_ABS/_headers"

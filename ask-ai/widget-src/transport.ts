@@ -26,7 +26,14 @@ class RemoteTransport implements AskTransport {
   async *ask(question: string, history: readonly ChatTurn[], signal?: AbortSignal): AsyncGenerator<SseEvent> {
     const corrected = (window as any).fuzzyCorrect ? (window as any).fuzzyCorrect(question) : question;
     const hints = await searchHints(corrected);
-    const body: AskRequest = { question, history, search_hints: hints || undefined };
+    const body: AskRequest = {
+      question,
+      history,
+      search_hints: hints || undefined,
+      // Send only the path. The worker validates it against the site's catalog
+      // before using it to select a source document.
+      page_url: window.location.pathname,
+    };
     const res = await fetch(this.config.endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

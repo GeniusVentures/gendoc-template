@@ -66,27 +66,51 @@ install_doxybook2() {
 
     # ── Download ──────────────────────────────────────────────────────────────
     echo "  Downloading ${zip_name}..."
-    if ! curl -fSL --progress-bar -o "${zip_path}" "${download_url}"; then
-        echo "Error: failed to download ${download_url}" >&2
-        rm -rf "${tmp_dir}"
-        exit 1
-    fi
-    echo "  Download complete (${tmp_dir}/${zip_name})"
+    local attempt
+    for attempt in 1 2 3; do
+        rm -f "${zip_path}"
+        if curl --fail --location --show-error --silent \
+            --retry 3 --retry-all-errors --connect-timeout 15 --max-time 120 \
+            --output "${zip_path}" "${download_url}" \
+            && unzip -t "${zip_path}" >/dev/null; then
+            break
+        fi
+
+        echo "  Download validation failed (attempt ${attempt}/3)." >&2
+        if [ -f "${zip_path}" ]; then
+            echo "  Received: $(file -b "${zip_path}")" >&2
+            ls -lh "${zip_path}" >&2
+            echo "  ZIP validation output:" >&2
+            unzip -t "${zip_path}" >&2 || true
+        fi
+        if [ "${attempt}" -eq 3 ]; then
+            echo "Error: failed to download a valid ZIP from ${download_url}" >&2
+            rm -rf "${tmp_dir}"
+            exit 1
+        fi
+        sleep 2
+    done
+    echo "  Download complete ($(du -h "${zip_path}" | cut -f1))"
 
     # ── Extract ───────────────────────────────────────────────────────────────
     echo "  Extracting..."
-    if ! unzip -o "${zip_path}" -d "${tmp_dir}" >/dev/null; then
-        echo "Error: failed to unzip ${zip_path}" >&2
-        rm -rf "${tmp_dir}"
-        exit 1
+    if ! unzip -o "${zip_path}" -d "${tmp_dir}"; then
+        # Some runner-provided unzip builds report a warning exit code after
+        # successfully writing every member. The binary is the only artifact
+        # needed here, so distinguish that case from an incomplete extraction.
+        if [ ! -f "${tmp_dir}/bin/doxybook2" ]; then
+            echo "Error: failed to extract doxybook2 from ${zip_path}" >&2
+            rm -rf "${tmp_dir}"
+            exit 1
+        fi
+        echo "  unzip returned a warning status; binary was extracted." >&2
     fi
 
     # ── Find the binary in the extracted contents ────────────────────────────
-    local binary_path
-    binary_path=$(find "${tmp_dir}" -type f -name "doxybook2" -perm +111 2>/dev/null | head -1)
-    if [ -z "${binary_path}" ]; then
-        # Fallback: look for doxybook2 anywhere in the extracted tree
-        binary_path=$(find "${tmp_dir}" -type f -name "doxybook2" 2>/dev/null | head -1)
+    local binary_path="${tmp_dir}/bin/doxybook2"
+    if [ ! -f "${binary_path}" ]; then
+        # Fallback for archives that place the binary in a different directory.
+        binary_path=$(find "${tmp_dir}" -type f -name "doxybook2" -print -quit 2>/dev/null || true)
         if [ -z "${binary_path}" ]; then
             echo "Error: doxybook2 binary not found in extracted archive" >&2
             echo "       Contents of ${tmp_dir}:" >&2
