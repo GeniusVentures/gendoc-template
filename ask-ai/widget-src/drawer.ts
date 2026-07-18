@@ -53,6 +53,7 @@ export class DrawerUI
     // Track its exact box so the header and composer both remain visible.
     this.syncVisualViewport();
     window.addEventListener("resize", this.syncVisualViewport);
+    window.addEventListener("scroll", this.syncVisualViewport, { passive: true });
     window.visualViewport?.addEventListener("resize", this.syncVisualViewport);
     window.visualViewport?.addEventListener("scroll", this.syncVisualViewport);
 
@@ -122,6 +123,7 @@ export class DrawerUI
 
   open(): void
   {
+    this.syncVisualViewport();
     this.drawer.classList.add("open");
     // Opening a drawer should not immediately raise the software keyboard on
     // phones.  It also avoids iOS Safari scrolling a fixed panel to the input.
@@ -187,8 +189,12 @@ export class DrawerUI
     }
 
     const viewport = window.visualViewport;
-    this.drawer.style.setProperty("--ask-viewport-left", `${viewport?.offsetLeft ?? 0}px`);
-    this.drawer.style.setProperty("--ask-viewport-top", `${viewport?.offsetTop ?? 0}px`);
+    // The mobile drawer is absolute rather than fixed. pageLeft/pageTop place
+    // it at the visual viewport's document coordinates; normal page scrolling
+    // then subtracts that same offset on screen. This avoids double-applying
+    // iOS keyboard and horizontal-scroll offsets to a fixed element.
+    this.drawer.style.setProperty("--ask-viewport-left", `${viewport?.pageLeft ?? window.scrollX}px`);
+    this.drawer.style.setProperty("--ask-viewport-top", `${viewport?.pageTop ?? window.scrollY}px`);
     this.drawer.style.setProperty("--ask-viewport-width", `${viewport?.width ?? window.innerWidth}px`);
     this.drawer.style.setProperty("--ask-viewport-height", `${viewport?.height ?? window.innerHeight}px`);
   };
