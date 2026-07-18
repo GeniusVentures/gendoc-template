@@ -130,7 +130,7 @@ jobs:
         run: npm ci --prefix ask-ai/worker
 
       - name: Typecheck worker
-        run: npm run typecheck --prefix ask-ai/worker
+        run: npm run typecheck --prefix ask-ai/worker -- --pretty false
 
       - name: Build browser widget
         run: ./ask-ai/worker/node_modules/.bin/tsc -p ask-ai/widget-src
