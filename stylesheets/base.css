@@ -160,6 +160,15 @@
     }
 }
 
+/* ── Fix nav container double-padding ────────────────────────────────────────
+   When a nav item has both a link and children (navigation.indexes enabled),
+   Material wraps the link + toggle icon in a .md-nav__container div that also
+   carries the .md-nav__link class.  Theme padding on both the container and
+   the inner <a> stacks, pushing the text slightly right of its siblings. */
+.md-nav__container > .md-nav__link {
+    padding-left: 0;
+}
+
 /* ── GitBook image / figure alignment ─────────────────────────────────────── */
 .md-typeset figure                        { display:block; margin:1rem auto; text-align:center; }
 .md-typeset figure img                    { display:inline-block; }
