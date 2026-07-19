@@ -1,7 +1,0 @@
-/*
- * Backward-compatible Protocol theme entry point.
- *
- * Protocol is the documented name for the emerald preset. Keep this small
- * alias so existing gendoc.yml files continue to load the intended theme.
- */
-@import url("./emerald.css");
