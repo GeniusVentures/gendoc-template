@@ -33,10 +33,10 @@ if [ ! -f "$MKDOCS_YML" ]; then
     exit 1
 fi
 
-if ! command -v mkdocs &>/dev/null; then
-    echo "Error: mkdocs not found." >&2
+if ! command -v properdocs &>/dev/null; then
+    echo "Error: properdocs not found." >&2
     echo "       Create a .venv with: python3 -m venv .venv && source .venv/bin/activate" >&2
-    echo "       Then: pip install mkdocs mkdocs-material mkdocs-literate-nav" >&2
+    echo "       Then: pip install properdocs mkdocs-material mkdocs-literate-nav" >&2
     exit 1
 fi
 
@@ -51,15 +51,18 @@ if [ -f "$PLUGINS_DIR/setup.py" ]; then
     pip install --quiet -e "$PLUGINS_DIR"
 fi
 
-# ── Read gendoc.yml values ────────────────────────────────────────────────────
+# ── Read gendoc.yml values (single Python call, emits shell assignments) ───────
 echo "Reading gendoc.yml..."
 
-read_yaml() {
-    python3 "$SCRIPT_DIR/read-yaml.py" "$GENDOC_YML" "$1"
-}
-
-SITE_DIR=$(read_yaml "mkdocs.site_dir")
-STRICT_RAW=$(read_yaml "mkdocs.strict")
+eval "$(python3 "$SCRIPT_DIR/read-yaml.py" "$GENDOC_YML" --batch \
+    "mkdocs.site_dir=SITE_DIR" \
+    "mkdocs.strict=STRICT_RAW" \
+    "navigation.generate_index=GENERATE_INDEX" \
+    "navigation.index_template=INDEX_TEMPLATE" \
+    "navigation.index_output=INDEX_OUTPUT" \
+    "paths.handwritten_docs=HANDWRITTEN_DOCS" \
+    "deploy.cloudflare.gzip_json=GZIP_JSON" \
+)"
 
 # ── Defaults ──────────────────────────────────────────────────────────────────
 if [ -z "$SITE_DIR" ]; then
@@ -72,32 +75,16 @@ else
     STRICT_FLAG=""
 fi
 
-# ── Step 1: Build source reference (Doxygen → doxybook2 → navigation) ────────
-echo ""
-echo "=============================================="
-echo "  Step 1: Building source reference"
-echo "=============================================="
-
-if bash "$BUILD_SOURCE_REFERENCE_SCRIPT"; then
-    echo "  Source reference build completed successfully"
-else
-    exit_code=$?
-    echo "Error: build-source-reference.sh failed with exit code $exit_code" >&2
-    exit $exit_code
-fi
-
-# ── Step 2: Regenerate configured navigation index ────────────────────────────
-GENERATE_INDEX=$(read_yaml "navigation.generate_index")
-INDEX_TEMPLATE=$(read_yaml "navigation.index_template")
-INDEX_OUTPUT=$(read_yaml "navigation.index_output")
-HANDWRITTEN_DOCS=$(read_yaml "paths.handwritten_docs")
+# ── Step 1: Regenerate configured navigation index ──────────────────────────────
+# Must run BEFORE Step 2 — build-navigation.py reads SUMMARY.md to generate
+# SUMMARY_EXT.md for MkDocs, and SUMMARY.md is git-ignored (regenerated fresh).
 INDEX_SCRIPT="$SCRIPT_DIR/generate-index.sh"
 HANDWRITTEN_DOCS_ABS="$HOST_ROOT/$HANDWRITTEN_DOCS"
 INDEX_TEMPLATE="${INDEX_TEMPLATE:-index.md.template}"
 INDEX_OUTPUT="${INDEX_OUTPUT:-index.md}"
 echo ""
 echo "=============================================="
-echo "  Step 2: Regenerating $INDEX_OUTPUT"
+echo "  Step 1: Regenerating $INDEX_OUTPUT"
 echo "=============================================="
 if [ "$GENERATE_INDEX" != "true" ]; then
     echo "  Skipped — navigation.generate_index is not true"
@@ -108,6 +95,22 @@ elif [ ! -f "$HANDWRITTEN_DOCS_ABS/$INDEX_TEMPLATE" ]; then
 else
     bash "$INDEX_SCRIPT" "$HANDWRITTEN_DOCS_ABS" "$INDEX_TEMPLATE" "$INDEX_OUTPUT"
     echo "  $INDEX_OUTPUT regenerated from $HANDWRITTEN_DOCS/$INDEX_TEMPLATE"
+fi
+
+# ── Step 2: Build source reference (Doxygen → doxybook2 → navigation) ────────
+# build-navigation.py (called at end of this step) reads SUMMARY.md to build
+# the literate-nav SUMMARY_EXT.md for MkDocs.
+echo ""
+echo "=============================================="
+echo "  Step 2: Building source reference"
+echo "=============================================="
+
+if bash "$BUILD_SOURCE_REFERENCE_SCRIPT"; then
+    echo "  Source reference build completed successfully"
+else
+    exit_code=$?
+    echo "Error: build-source-reference.sh failed with exit code $exit_code" >&2
+    exit $exit_code
 fi
 
 # ── Step 3: Compile widget TypeScript (before mkdocs copies JS) ────────────
@@ -126,11 +129,11 @@ echo "=============================================="
 SITE_DIR_ABS="$TEMPLATE_ROOT/$SITE_DIR"
 echo "  Output directory: $SITE_DIR_ABS"
 
-if mkdocs build -f "$MKDOCS_YML" --site-dir "$SITE_DIR_ABS" $STRICT_FLAG; then
-    echo "  MkDocs build completed successfully"
+if properdocs build -f "$MKDOCS_YML" --site-dir "$SITE_DIR_ABS" $STRICT_FLAG; then
+    echo "  ProperDocs build completed successfully"
 else
     exit_code=$?
-    echo "Error: mkdocs build failed with exit code $exit_code" >&2
+    echo "Error: properdocs build failed with exit code $exit_code" >&2
     exit $exit_code
 fi
 
@@ -173,7 +176,6 @@ echo "=============================================="
 echo "  Step 8:  Gzipping JSON files for dev server"
 echo "=============================================="
 
-GZIP_JSON=$(read_yaml "deploy.cloudflare.gzip_json")
 GZIP_JSON="${GZIP_JSON:-True}"
 if [ "$GZIP_JSON" = "True" ]; then
     count=0

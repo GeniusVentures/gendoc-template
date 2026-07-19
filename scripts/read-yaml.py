@@ -53,6 +53,33 @@ def main():
         sys.exit(1)
 
     yaml_path = sys.argv[1]
+
+    # ── Batch mode: key1=VAR1 key2=VAR2 ... ─────────────────────────────
+    # Emits shell variable assignments for eval.  Keys are the dotted YAML
+    # paths; the shell variable name follows the equals sign.
+    # Suffix :join (comma) or :join-space (space) on var_name joins list values.
+    if "--batch" in sys.argv:
+        for arg in sys.argv[2:]:
+            if arg.startswith("--"):
+                continue
+            if "=" not in arg:
+                print(f"read-yaml.py --batch: argument '{arg}' missing '=' separator", file=sys.stderr)
+                sys.exit(1)
+            key_path, var_spec = arg.split("=", 1)
+            join_char = None
+            if var_spec.endswith(":join-space"):
+                var_name = var_spec[:-len(":join-space")]
+                join_char = " "
+            elif var_spec.endswith(":join"):
+                var_name = var_spec[:-len(":join")]
+                join_char = ","
+            else:
+                var_name = var_spec
+            value = read_yaml(yaml_path, key_path)
+            print(f"{var_name}='{format_value(value, join_char=join_char)}'")
+        return
+
+    # ── Single-key mode ─────────────────────────────────────────────────
     key_path = sys.argv[2]
     join_char = None
     if "--join" in sys.argv:

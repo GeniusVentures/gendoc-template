@@ -24,12 +24,17 @@ if [ -d "$VENV" ]; then
     export PATH="$VENV/bin:$PATH"
 fi
 
-read_yaml() {
-    python3 "$SCRIPT_DIR/read-yaml.py" "$GENDOC_YML" "$1"
-}
-
-LLMS_ENABLED=$(read_yaml "llms.enabled")
-ASK_ENABLED=$(read_yaml "llms.ask.enabled")
+# ── Read gendoc.yml values (single Python call) ────────────────────────────────
+eval "$(python3 "$SCRIPT_DIR/read-yaml.py" "$GENDOC_YML" --batch \
+    "llms.enabled=LLMS_ENABLED" \
+    "llms.ask.enabled=ASK_ENABLED" \
+    "mkdocs.site_dir=SITE_DIR" \
+    "llms.ask.endpoint=ASK_ENDPOINT" \
+    "llms.ask.title=ASK_TITLE" \
+    "project.name=PROJECT_NAME" \
+    "llms.ask.placeholder=ASK_PLACEHOLDER" \
+    "llms.site_url=SITE_URL" \
+)"
 
 if [ "$LLMS_ENABLED" != "true" ] || [ "$ASK_ENABLED" != "true" ]; then
     echo "  Ask widget: disabled — skipping"
@@ -49,14 +54,12 @@ if [ "$MODE" = "compile" ]; then
     echo "  Skipping ask-config.json (--compile-only)"
     exit 0
 fi
-SITE_DIR=$(read_yaml "mkdocs.site_dir")
 SITE_DIR="${SITE_DIR:-site}"
 SITE_DIR_ABS="$TEMPLATE_ROOT/$SITE_DIR"
 
 # Endpoint resolution: configured value takes priority (shared-worker / custom
 # domain scenario); otherwise fall back to the auto-captured .endpoint file
 # written by setup.sh or deploy-ask.sh.
-ASK_ENDPOINT=$(read_yaml "llms.ask.endpoint")
 if [ -z "$ASK_ENDPOINT" ]; then
     ENDPOINT_FILE="$TEMPLATE_ROOT/ask-ai/.endpoint"
     if [ ! -f "$ENDPOINT_FILE" ]; then
@@ -68,14 +71,8 @@ if [ -z "$ASK_ENDPOINT" ]; then
     ASK_ENDPOINT=$(head -1 "$ENDPOINT_FILE" | tr -d '\n')
 fi
 
-ASK_TITLE=$(read_yaml "llms.ask.title")
-PROJECT_NAME=$(read_yaml "project.name")
 ASK_TITLE="${ASK_TITLE:-Ask ${PROJECT_NAME:-Docs}}"
-
-ASK_PLACEHOLDER=$(read_yaml "llms.ask.placeholder")
 ASK_PLACEHOLDER="${ASK_PLACEHOLDER:-Ask a question...}"
-
-SITE_URL=$(read_yaml "llms.site_url")
 LLMS_FULL_URL="${SITE_URL%/}/llms-full.txt"
 
 echo "  Generating ask-config.json (endpoint: $ASK_ENDPOINT)"

@@ -5,16 +5,13 @@
  * changes needed.
  */
 (() => {
-  const base = new URL(".", (document.currentScript as HTMLScriptElement).src);
+    const base = new URL(".", (document.currentScript as HTMLScriptElement).src);
 
-  function loadSync(name: string): void {
-    const src = new URL(name, base).href;
-    document.write(`<script src="${src}"><\/script>`);
-  }
+    function loadSync(name: string): void {
+        const src = new URL(name, base).href;
+        document.write(`<script src="${src}"><\/script>`);
+    }
 
-  const injectors = [
-    "../fetch-gzip.js",
-    "search-fuzzy.js",
-  ];
-  for (const name of injectors) loadSync(name);
+    const injectors = ["../fetch-gzip.js", "search-fuzzy.js"];
+    for (const name of injectors) loadSync(name);
 })();
