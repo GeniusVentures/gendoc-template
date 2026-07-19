@@ -166,7 +166,7 @@
    carries the .md-nav__link class.  Theme padding on both the container and
    the inner <a> stacks, pushing the text slightly right of its siblings. */
 .md-nav__container > .md-nav__link {
-    padding-left: 0;
+    padding: 0;
 }
 
 /* ── GitBook image / figure alignment ─────────────────────────────────────── */
