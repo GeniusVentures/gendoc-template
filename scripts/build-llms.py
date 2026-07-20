@@ -57,6 +57,12 @@ def die(msg: str) -> None:
 def word_count(text: str) -> int:
     return len(text.split())
 
+def _top_level_num(title: str):
+    """Return the integer top-level section number from a title like '3 System
+    Architecture Overview' or '9. Execution and Performance...', or None."""
+    m = re.match(r"^(\d+)\b", title)
+    return int(m.group(1)) if m else None
+
 def doc_url(rel_md: str, use_directory_urls: bool) -> str:
     """Map docs/<rel>.md to its published URL the way MkDocs does.
     Returns a site-relative path (e.g. /model-and-router/) so the worker
@@ -162,7 +168,8 @@ if corpus_cache.exists() and any(corpus_cache.iterdir()):
 # --------------------------------------------------------------------------- #
 
 entries = []  # {key, url, title, words, content|None, section}
-seen = set()  # deduplicate: SUMMARY_EXT.md has one entry per heading, all to the same file
+seen = set()     # deduplicate by file path
+seen_nums = {}   # rel -> set of top-level section numbers already merged
 
 section = None
 for docs_dir in docs_dirs:
@@ -181,8 +188,24 @@ for docs_dir in docs_dirs:
         for title, rel in re.findall(r"\[([^\]]+)\]\(([^)]+\.mdx?(?:#[^)]*)?)\)", line):
             rel = re.sub(r"#.*$", "", rel)   # strip anchor
             if rel in seen:
+                # Same file referenced with a different *top-level* section
+                # number (e.g. "3 System Overview" and "4 GNUS Component
+                # Mapping" both point to system-overview.md).  Merge only
+                # the first occurrence of each top-level section title so
+                # the catalog doesn't show numbering gaps (4, 6, 10, 12,
+                # 14).  Subsections (2.1, 4.1.1, etc.) are skipped -- their
+                # top-level number was already merged.
+                new_num = _top_level_num(title)
+                if new_num is not None and new_num not in seen_nums.get(rel, set()):
+                    existing = next((e for e in entries if e["key"] == f"docs:{rel}"), None)
+                    if existing:
+                        existing["title"] = f"{existing['title']} / {title}"
+                    seen_nums.setdefault(rel, set()).add(new_num)
                 continue
             seen.add(rel)
+            num = _top_level_num(title)
+            if num is not None:
+                seen_nums.setdefault(rel, set()).add(num)
             src = docs_dir / rel
             if not src.exists():
                 print(f"  WARNING: SUMMARY.md links missing file {rel} (in {docs_dir})")
