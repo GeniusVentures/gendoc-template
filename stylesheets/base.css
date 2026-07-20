@@ -10,6 +10,8 @@
 /* ── Sidebar viewport sizing fix ──────────────────────────────────────────── */
 :root {
     --gnus-sidebar-width: 16rem;
+    --gnus-header-height: 2.4rem;         /* fallback, overridden by theme presets */
+    --gnus-header-border-width: 0px;      /* overridden by themes that add a border */
 }
 
 .md-main__inner {
@@ -20,10 +22,14 @@
 }
 
 @media screen and (min-width: 76.25em) {
+    html, body {
+        overflow: hidden;
+    }
+
     .md-container {
         display: grid;
         grid-template-rows: minmax(0, 1fr) auto;
-        height: calc(100vh - 2.4rem);
+        height: calc(100vh - var(--gnus-header-height) - var(--gnus-header-border-width));
         overflow: hidden;
     }
 

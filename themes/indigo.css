@@ -17,6 +17,7 @@
   --gnus-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --gnus-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --gnus-header-height: 56px;
+  --gnus-header-border-width: 1px;
 }
 
 /* Material bumps html{font-size} to 137.5% at >=1220px and 150% at >=1600px
