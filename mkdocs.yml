@@ -89,8 +89,6 @@ markdown_extensions:
   - md_in_html
 
 extra_javascript:
-  - https://unpkg.com/mermaid@10/dist/mermaid.min.js
-  - /javascripts/mermaid.js
   - /javascripts/external-links.js
   - /javascripts/mathjax.js
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js

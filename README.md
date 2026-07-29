@@ -574,4 +574,4 @@ your-project/                   # HOST PROJECT ROOT
 
 ## License
 
-Proprietary -- GNUS.AI / GeniusVentures
+MIT — see [LICENSE](LICENSE).
