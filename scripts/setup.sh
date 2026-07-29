@@ -16,7 +16,10 @@ fi
 export PATH="$VENV/bin:$PATH"
 
 # Install/refresh required packages.
-pip install --quiet properdocs mkdocs-material mkdocs-literate-nav pyyaml
+pip install --quiet properdocs mkdocs-material mkdocs-literate-nav mkdocs-section-index pyyaml
+
+# ── Install binary dependencies (doxybook2) ──────────────────────────────
+bash "$SCRIPT_DIR/install-deps.sh"
 
 if [ ! -f "$GENDOC_YML" ]; then
     echo "Error: gendoc.yml not found at $GENDOC_YML" >&2
