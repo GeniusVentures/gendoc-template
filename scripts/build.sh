@@ -35,8 +35,7 @@ fi
 
 if ! command -v properdocs &>/dev/null; then
     echo "Error: properdocs not found." >&2
-    echo "       Create a .venv with: python3 -m venv .venv && source .venv/bin/activate" >&2
-    echo "       Then: pip install properdocs mkdocs-material mkdocs-literate-nav" >&2
+    echo "       Run: gendoc-template/scripts/setup.sh" >&2
     exit 1
 fi
 
