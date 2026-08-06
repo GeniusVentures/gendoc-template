@@ -239,6 +239,19 @@ with open(sys.argv[1], 'w') as f:
 " "$doxyfile_out" "$input_doxy" "$file_patterns_doxy" "$exclude_doxy"
 
     echo "  Doxyfile written to $doxyfile_out"
+    echo "  --- Doxyfile INPUT/FILE_PATTERNS/RECURSIVE ---"
+    grep -E "^(INPUT|FILE_PATTERNS|RECURSIVE|EXCLUDE)" "$doxyfile_out" | head -40
+    echo "  --- end Doxyfile ---"
+    echo "  --- verify first INPUT dir exists ---"
+    first_input=$(grep "^INPUT" "$doxyfile_out" | head -1 | sed 's/^INPUT\s*=\s*//' | awk '{print $1}' | tr -d '\\')
+    echo "  first INPUT: $first_input"
+    if [ -d "$first_input" ]; then
+        echo "  exists. cpp/hpp count: $(find "$first_input" -name '*.cpp' -o -name '*.hpp' 2>/dev/null | wc -l)"
+        ls "$first_input" | head -5
+    else
+        echo "  ::error::INPUT dir does not exist: $first_input"
+    fi
+    echo "  --- end verify ---"
 
     # ── Generate doxybook config (per-set base_url) ──────────────────────────
     local doxybook_out="$set_doxy_dir/doxybook.json"
