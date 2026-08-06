@@ -369,8 +369,13 @@ export default {
 
         // Send sources before streaming — tests and UI need them even on hints-only path.
         // Include ALL hints as sources, not just the primary doc.
+        // Normalize to root-relative URLs: hint URLs arrive site-relative
+        // (no leading slash) from the MkDocs search index, which the widget
+        // would otherwise resolve against the current page's directory.
+        const toRootRelative = (u: string): string =>
+          /^https?:\/\//i.test(u) || u.startsWith('/') || u.startsWith('#') ? u : `/${u}`;
         const sourcesForSend: Array<{ title: string; url: string }> = [];
-        if (primaryContext) sourcesForSend.push({ title: hintedTitle, url: hintedUrl });
+        if (primaryContext) sourcesForSend.push({ title: hintedTitle, url: toRootRelative(hintedUrl) });
         if (searchHints) {
           for (const hintLine of searchHints.split('\n')) {
             const sm = hintLine.match(/^- \[([^\]]+)\]\(([^)]+)\)/);
@@ -379,7 +384,7 @@ export default {
             if (sUrl.startsWith('#') && !sUrl.startsWith('#/')) continue;
             // Don't duplicate the primary doc
             if (sUrl === hintedUrl) continue;
-            sourcesForSend.push({ title: sm[1], url: sUrl });
+            sourcesForSend.push({ title: sm[1], url: toRootRelative(sUrl) });
           }
         }
         await send({ sources: sourcesForSend });
@@ -474,6 +479,12 @@ export default {
           }
         }
 
+        // Fallback: when no context page or search hint supplied a primary,
+        // use the highest-ranked fetched document.
+        if (!primaryDoc && docs.length > 0) {
+          primaryDoc = docs[0];
+        }
+
         // Separate: primary first (if we have it), then supporting.
         const supportingDocs = primaryDoc
           ? docs.filter(d => d.url !== primaryDoc!.url)
@@ -495,17 +506,44 @@ export default {
           }
         }
 
-        // Build supporting context
-        let suppContext = '';
+        // Build supporting context — select best-first for budget, then
+        // interleave weak→strong to match the LLM attention curve.
+        const selectedSupporting: string[] = [];
         let used = 0;
         for (const d of supportingDocs) {
-          const cap = Math.min(DOC_CHAR_CAP, TOTAL_CHAR_CAP - used);
+          const remaining = TOTAL_CHAR_CAP - used;
+          if (remaining < 200) break;
+          const cap = Math.min(DOC_CHAR_CAP, remaining);
           const slice = windowSlice(d.text, terms, cap);
           if (slice.length < 200) continue;
-          suppContext += `\n\n--- source: ${d.url}\ntitle: ${d.title}\n---\n${slice}`;
+          selectedSupporting.push(
+            `--- source: ${d.url}\ntitle: ${d.title}\n---\n${slice}`
+          );
           used += slice.length;
         }
-        debug(`context: primary=${primaryContext ? 'yes' : 'none'}, supporting=${supportingDocs.length} docs, ${used} chars`);
+        // Interleave weak→strong list so relevance tracks the LLM's
+        // U-shaped attention curve: strongest docs land at the primacy and
+        // recency edges of the block; weakest settle into the middle where
+        // attention fades.
+        // [1,2,3,4,5,6,7,8,9,10] → [8,7,5,3,1, 2,4,6, 9,10]
+        const reversed = selectedSupporting.reverse();
+        const interleaved: string[] = [];
+        // 1-based odds from the end (primacy edge → fading in)
+        for (let i = reversed.length - 1; i >= 0; i--) {
+          if ((i + 1) % 2 === 1) interleaved.push(reversed[i]);
+        }
+        // 1-based evens from the start (fading out → recency edge)
+        for (let i = 0; i < reversed.length; i++) {
+          if ((i + 1) % 2 === 0) interleaved.push(reversed[i]);
+        }
+        // Swap the primacy-edge and second-from-recency-edge docs so the
+        // two strongest supporting docs (9,10) are adjacent at recency.
+        if (interleaved.length >= 4) {
+          [interleaved[0], interleaved[interleaved.length - 2]] =
+            [interleaved[interleaved.length - 2], interleaved[0]];
+        }
+        const suppContext = interleaved.join('\n\n');
+        debug(`context: primary=${primaryContext ? 'yes' : 'none'}, supporting=${selectedSupporting.length} docs, ${used} chars`);
 
         // Build correction note
         const corrPairs = Object.entries(corrections);
@@ -546,14 +584,14 @@ export default {
           `You are a specialized assistant that ONLY answers questions about this project's official documentation.\n` +
           reasoningInstruction +
           `\n${queryBlock}` +
-          (primaryContext
-            ? `\nPRIMARY DOCUMENT — READ THIS FIRST\n${primaryContext}\n`
-            : '') +
-          (suppContext
-            ? `\nSUPPORTING DOCUMENTS\n${suppContext}\n`
-            : '') +
           (searchHints
             ? `\nSEARCH HINTS\n${searchHints}\n`
+            : '') +
+          (suppContext
+            ? `\nSUPPORTING DOCUMENTS — ORDERED FROM LOWER TO HIGHER RELEVANCE\n${suppContext}\n`
+            : '') +
+          (primaryContext
+            ? `\nPRIMARY DOCUMENT — HIGHEST RELEVANCE\n${primaryContext}\n`
             : '') +
           answerInstruction;
 

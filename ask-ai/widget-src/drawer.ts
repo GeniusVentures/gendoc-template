@@ -537,7 +537,15 @@ function buildSourceList(sources: readonly { title: string; url: string }[]): HT
     details.appendChild(summary);
     for (const source of sources) {
         const anchor = document.createElement("a");
-        anchor.href = source.url;
+        // Source URLs arrive site-relative ("SuperGenius/Files/...") from the
+        // MkDocs search index or root-relative ("/SuperGenius/...") from the
+        // catalog. Resolve against the origin so links work from any page —
+        // a bare relative URL would otherwise resolve against the current
+        // page's directory and 404.
+        const url = source.url;
+        anchor.href = /^https?:\/\//i.test(url)
+            ? url
+            : new URL(url.startsWith("/") ? url : `/${url}`, window.location.origin).href;
         anchor.target = "_blank";
         anchor.rel = "noopener";
         anchor.textContent = source.title || source.url;
