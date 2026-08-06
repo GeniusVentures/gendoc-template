@@ -88,15 +88,30 @@ if [ -z "$DOXY_OUTPUT_DIR" ]; then
 fi
 
 # ── Resolve paths relative to HOST_ROOT ───────────────────────────────────────
+# Canonicalize (resolve ".." segments) — doxygen 1.9.x can fail to scan INPUT
+# dirs whose paths contain literal ".." components.
 resolve_path() {
     if [ -z "$1" ]; then
         echo ""
         return
     fi
-    if [[ "$1" == /* ]]; then
-        echo "$1"
+    local p="$1"
+    if [[ "$p" != /* ]]; then
+        p="$HOST_ROOT/$p"
+    fi
+    # realpath -m canonicalizes without requiring every component to exist.
+    if realpath -m "$p" >/dev/null 2>&1; then
+        realpath -m "$p"
     else
-        echo "$HOST_ROOT/$1"
+        # Fallback for realpath without -m (older macOS): resolve via cd.
+        local dir base
+        dir="$(dirname "$p")"
+        base="$(basename "$p")"
+        if [ -d "$dir" ]; then
+            echo "$(cd "$dir" && pwd)/$base"
+        else
+            echo "$p"
+        fi
     fi
 }
 
@@ -152,9 +167,12 @@ if [ -z "$MANIFEST" ]; then
 fi
 
 # ── Helpers: convert space-joined lists to Doxyfile backslash-continued form ──
+# set -f disables pathname expansion so patterns like "*.md" survive the
+# unquoted word-split instead of globbing against the current directory.
 to_doxy_list() {
     local out=""
     local item
+    set -f
     for item in $1; do
         if [ -z "$out" ]; then
             out="$item"
@@ -162,6 +180,7 @@ to_doxy_list() {
             out="$out \\"$'\n'"                         $item"
         fi
     done
+    set +f
     printf '%s' "$out"
 }
 
@@ -239,8 +258,13 @@ with open(sys.argv[1], 'w') as f:
 " "$doxyfile_out" "$input_doxy" "$file_patterns_doxy" "$exclude_doxy"
 
     echo "  Doxyfile written to $doxyfile_out"
-    echo "  --- Doxyfile INPUT/FILE_PATTERNS/RECURSIVE ---"
-    grep -E "^(INPUT|FILE_PATTERNS|RECURSIVE|EXCLUDE)" "$doxyfile_out" | head -40
+    echo "  --- Doxyfile INPUT/FILE_PATTERNS/RECURSIVE (with continuations) ---"
+    awk '
+        /^[A-Z_]+[[:space:]]*=/ {
+            keep = ($0 ~ /^(INPUT|FILE_PATTERNS|RECURSIVE|EXCLUDE)[[:space:]]*=/)
+        }
+        keep { print }
+    ' "$doxyfile_out"
     echo "  --- end Doxyfile ---"
     echo "  --- verify first INPUT dir exists ---"
     first_input=$(grep "^INPUT" "$doxyfile_out" | head -1 | sed 's/^INPUT\s*=\s*//' | awk '{print $1}' | tr -d '\\')
