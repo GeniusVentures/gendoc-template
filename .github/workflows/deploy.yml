@@ -68,9 +68,14 @@ jobs:
           set -u
 
           # Use insteadOf so the token never lands in any repo's .git/config.
+          # Cover both HTTPS and SSH-style GitHub URLs so submodules that
+          # reference git@github.com:... also pick up token auth.
           git config --global \
             url."https://x-access-token:${CLONE_TOKEN}@github.com/".insteadOf \
             "https://github.com/"
+          git config --global --add \
+            url."https://x-access-token:${CLONE_TOKEN}@github.com/".insteadOf \
+            "git@github.com:"
 
           clone_one() {
             local repo="$1" path="$2" ref="${3:-}"
@@ -116,9 +121,10 @@ jobs:
             fi
           done
 
-          # Scrub the insteadOf rule so the token can't leak via later git ops.
-          git config --global --unset \
-            url."https://x-access-token:${CLONE_TOKEN}@github.com/".insteadOf
+          # Scrub both insteadOf values so the token can't leak via later git ops.
+          # --unset-all because we used --add for the second entry.
+          git config --global --unset-all \
+            url."https://x-access-token:${CLONE_TOKEN}@github.com/".insteadOf || true
 
           [ "$failed" -eq 0 ] || exit 1
           echo "All clones complete."
