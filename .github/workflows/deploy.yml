@@ -79,7 +79,7 @@ jobs:
 
           clone_one() {
             local repo="$1" path="$2" ref="${3:-}"
-            local args=(--recurse-submodules --quiet)
+            local args=(--recurse-submodules)
             if [ -n "$ref" ]; then
               args+=(--branch "$ref")
             fi
@@ -138,8 +138,21 @@ jobs:
             echo "--- $path ---"
             if [ -d "$path" ]; then
               du -sh "$path"
-              find "$path" -maxdepth 2 -type d | head -10
               echo "  source files: $(find "$path" -name '*.cpp' -o -name '*.hpp' 2>/dev/null | wc -l)"
+              echo "  submodule status:"
+              git -C "$path" submodule status --recursive || true
+              echo "  gendoc.yml INPUT dirs:"
+              for d in src example ProofSystem/include ProofSystem/src \
+                       ProofSystem/SGProofCircuits/src ProofSystem/SGProofCircuits/include \
+                       SGProcessingManager/include SGProcessingManager/src \
+                       gRPCForSuperGenius/proto-include GeniusKDF/src \
+                       evmrelay/src evmrelay/include evmrelay/examples; do
+                if [ -d "$path/$d" ]; then
+                  echo "    OK      $d ($(find "$path/$d" -type f 2>/dev/null | wc -l | tr -d ' ') files)"
+                else
+                  echo "    MISSING $d"
+                fi
+              done
             else
               echo "::error::$path does not exist after clone"
               exit 1
