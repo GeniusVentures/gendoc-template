@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       template-path:
-        description: Path to the gendoc-template checkout in the parent repository
+        description: Path to the gendoc-template checkout inside the parent repo
         required: false
         default: gendoc-template
         type: string
@@ -13,10 +13,24 @@ on:
         required: false
         default: "3.11"
         type: string
-      node-version:
-        description: Node.js version used for Wrangler and the Ask widget
+      siblings:
+        description: >-
+          Space-separated sibling repository specs, cloned in parallel with
+          the parent. Each spec is "owner/repo:path" or "owner/repo:path@ref".
+          Path is relative to the workspace root; the parent is checked out
+          to ./parent, so use a sibling directory name (e.g. "SuperGenius")
+          to get the local-monorepo layout that gendoc.yml's "../Sibling/..."
+          source_references expect.
         required: false
-        default: "20"
+        default: ""
+        type: string
+      siblings-token:
+        description: >-
+          Token used to clone private sibling repos. Defaults to the workflow's
+          GITHUB_TOKEN, which works for public repos and same-org private repos
+          when the workflow's permissions allow it.
+        required: false
+        default: ""
         type: string
     secrets:
       CLOUDFLARE_API_TOKEN:
@@ -37,18 +51,81 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     env:
-      TEMPLATE_PATH: ${{ inputs.template-path }}
+      TEMPLATE_PATH: parent/${{ inputs.template-path }}
 
     steps:
-      - name: Checkout parent repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
+      # Clone the parent and all sibling repositories concurrently. Doing it
+      # in one step with backgrounded git clones is faster than N sequential
+      # actions/checkout invocations and lets the parent land in ./parent so
+      # siblings can sit next to it (matching a local monorepo layout).
+      - name: Clone parent and sibling repositories in parallel
+        env:
+          SIBLINGS: ${{ inputs.siblings }}
+          CLONE_TOKEN: ${{ inputs.siblings-token != '' && inputs.siblings-token || github.token }}
+          PARENT_REPO: ${{ github.repository }}
+          PARENT_SHA: ${{ github.sha }}
+        run: |
+          set -u
+
+          # Use insteadOf so the token never lands in any repo's .git/config.
+          git config --global \
+            url."https://x-access-token:${CLONE_TOKEN}@github.com/".insteadOf \
+            "https://github.com/"
+
+          clone_one() {
+            local repo="$1" path="$2" ref="${3:-}"
+            local args=(--recurse-submodules --quiet)
+            if [ -n "$ref" ]; then
+              args+=(--branch "$ref")
+            fi
+            git clone "${args[@]}" "https://github.com/${repo}.git" "$path"
+          }
+
+          pids=()
+          labels=()
+
+          # Parent: full clone (needed for any git-derived build metadata).
+          echo "Cloning parent $PARENT_REPO -> parent (sha: $PARENT_SHA)"
+          (
+            git clone --recurse-submodules --quiet --no-checkout \
+              "https://github.com/${PARENT_REPO}.git" parent \
+              && git -C parent checkout --quiet "$PARENT_SHA" \
+              && git -C parent submodule update --init --recursive
+          ) &
+          pids+=($!)
+          labels+=("$PARENT_REPO (parent)")
+
+          # Siblings: shallow when a ref is given, otherwise default-branch tip.
+          for spec in $SIBLINGS; do
+            repo="${spec%%:*}"
+            rest="${spec#*:}"
+            path="${rest%%@*}"
+            ref=""
+            [[ "$rest" == *"@"* ]] && ref="${rest##*@}"
+            echo "Cloning sibling $repo -> $path (ref: ${ref:-default})"
+            clone_one "$repo" "$path" "$ref" &
+            pids+=($!)
+            labels+=("$repo")
+          done
+
+          failed=0
+          for i in "${!pids[@]}"; do
+            if ! wait "${pids[$i]}"; then
+              echo "::error::clone failed: ${labels[$i]}"
+              failed=1
+            fi
+          done
+
+          # Scrub the insteadOf rule so the token can't leak via later git ops.
+          git config --global --unset \
+            url."https://x-access-token:${CLONE_TOKEN}@github.com/".insteadOf
+
+          [ "$failed" -eq 0 ] || exit 1
+          echo "All clones complete."
 
       - name: Validate parent-project layout
         run: |
-          test -f gendoc.yml
+          test -f parent/gendoc.yml
           test -f "$TEMPLATE_PATH/mkdocs.yml"
           test -f "$TEMPLATE_PATH/scripts/build.sh"
 
@@ -57,12 +134,12 @@ jobs:
         with:
           python-version: ${{ inputs.python-version }}
           cache: pip
-          cache-dependency-path: ${{ inputs.template-path }}/requirements.txt
+          cache-dependency-path: parent/${{ inputs.template-path }}/requirements.txt
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: ${{ inputs.node-version }}
+          node-version: "24"
 
       - name: Install Python dependencies
         run: |
@@ -83,6 +160,7 @@ jobs:
       # normally denotes a shared/external Worker, so leave it untouched unless
       # llms.ask.deploy_worker is explicitly enabled.
       - name: Deploy Ask AI Worker
+        working-directory: parent
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -98,14 +176,15 @@ jobs:
           raise SystemExit(0 if llms.get("enabled") and ask.get("enabled") and deploy_worker else 1)
           PYTHON
           then
-            bash "$TEMPLATE_PATH/scripts/deploy-ask.sh" gendoc.yml
+            bash "${{ inputs.template-path }}/scripts/deploy-ask.sh" gendoc.yml
           else
             echo "Ask AI Worker is disabled or externally managed; skipping Worker deployment."
           fi
 
       - name: Generate Wrangler configuration
+        working-directory: parent
         run: |
-          python - "$TEMPLATE_PATH" <<'PYTHON'
+          python - "${{ inputs.template-path }}" <<'PYTHON'
           from pathlib import Path
           import sys
           import yaml
@@ -129,10 +208,12 @@ jobs:
           PYTHON
 
       - name: Build documentation
-        run: bash "$TEMPLATE_PATH/scripts/build.sh"
+        working-directory: parent
+        run: bash "${{ inputs.template-path }}/scripts/build.sh"
 
       - name: Deploy to Cloudflare Pages
+        working-directory: parent
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: bash "$TEMPLATE_PATH/scripts/deploy.sh"
+        run: bash "${{ inputs.template-path }}/scripts/deploy.sh"
