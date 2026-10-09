@@ -1,6 +1,7 @@
 import { LIMITS } from "./config.js";
 import type { AskConfig, AskRequest, ChatTurn, SseEvent } from "./types.js";
 import { searchHints } from "./site-search.js";
+import { retrievalQuery } from "./retrieval-query.js";
 
 /**
  * A transport answers one question as a stream of {@link SseEvent}s.
@@ -24,8 +25,11 @@ class RemoteTransport implements AskTransport {
     constructor(private readonly config: AskConfig) {}
 
     async *ask(question: string, history: readonly ChatTurn[], signal?: AbortSignal): AsyncGenerator<SseEvent> {
-        const corrected = (window as any).fuzzyCorrect ? (window as any).fuzzyCorrect(question) : question;
+        if (signal?.aborted) return;
+        const query = retrievalQuery(question, history);
+        const corrected = (window as any).fuzzyCorrect ? (window as any).fuzzyCorrect(query) : query;
         const hints = await searchHints(corrected);
+        if (signal?.aborted) return;
         const body: AskRequest = {
             question,
             history,
