@@ -132,6 +132,9 @@ jobs:
       - name: Typecheck worker
         run: npm run typecheck --prefix ask-ai/worker
 
+      - name: Test search and Ask AI happy and unhappy paths
+        run: npm test --prefix ask-ai/worker
+
       - name: Build browser widget
         run: ./ask-ai/worker/node_modules/.bin/tsc -p ask-ai/widget-src
 

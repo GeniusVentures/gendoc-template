@@ -156,6 +156,11 @@ else
     echo "  Skipped — search_index.json or build-vocab.py not found"
 fi
 
+# Ask AI uses a precomputed section index; the search box still uses Material.
+if [ -f "$SEARCH_INDEX" ]; then
+    python3 "$SCRIPT_DIR/build-ask-search.py" "$SEARCH_INDEX" "$SITE_DIR_ABS/data/ask-search.json"
+fi
+
 # ── Step 6: Generate ask-config.json (after mkdocs, before gzip) ───────────
 echo ""
 echo "=============================================="

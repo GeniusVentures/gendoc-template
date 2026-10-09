@@ -16,6 +16,8 @@ import { loadCatalog, scoreEntries, fetchDoc } from './catalog.js';
 import { extractTerms, ed1Variants } from './normalizer.js';
 import { isJailbreakAttempt } from './jailbreak.js';
 import { PROVIDERS } from './providers.js';
+import { cleanHistory, retrievalQuery } from '../../widget-src/retrieval-query.js';
+import { approvedHints, selectContext } from './retrieval.js';
 
 /** Levenshtein edit distance.  Catch-all when ED1 Set lookup finds nothing. */
 function editDist(a: string, b: string): number {
@@ -33,21 +35,6 @@ function editDist(a: string, b: string): number {
     [prev, cur] = [cur, prev];
   }
   return prev[n];
-}
-
-/** Return a window of `text` centered around the first occurrence of any `terms`, up to `cap` chars. */
-function windowSlice(text: string, terms: string[], cap: number): string {
-  if (text.length <= cap) return text;
-  let best = -1;
-  const lower = text.toLowerCase();
-  for (const t of terms) {
-    const idx = lower.indexOf(t.toLowerCase());
-    if (idx >= 0 && (best < 0 || idx < best)) best = idx;
-  }
-  if (best < 0) return text.slice(0, cap);
-  const half = Math.floor(cap / 2);
-  const start = Math.max(0, best - half);
-  return text.slice(start, start + cap);
 }
 
 /** Normalize a same-origin documentation path for catalog comparison. */
@@ -180,10 +167,13 @@ export default {
     } catch {
       return json({ error: 'bad json' }, 400, cors);
     }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return json({ error: 'bad json' }, 400, cors);
+    }
 
     const question = String(body.question || '').slice(0, 1000).trim();
-    const history = Array.isArray(body.history) ? body.history.slice(-6) : [];
-    const searchHints = String(body.search_hints || '').slice(0, 3000).trim();
+    const history = cleanHistory(body.history);
+    let searchHints = String(body.search_hints || '').slice(0, 3000).trim();
     const pageUrl = String(body.page_url || '').slice(0, 2048).trim();
 
     if (!question) {
@@ -215,7 +205,8 @@ export default {
 
     // === Main Logic ===
     const entries = await loadCatalog(env, origin);
-    const { terms, corrections, unmatched } = await extractTerms(env, question, origin);
+    searchHints = approvedHints(searchHints, entries, origin);
+    const { terms, corrections, unmatched } = await extractTerms(env, retrievalQuery(question, history), origin);
     let top = scoreEntries(entries, terms).slice(0, 30);
     const isContextFreeQuestion = terms.length === 0 && unmatched.length === 0;
     const contextEntry = isContextFreeQuestion
@@ -288,8 +279,8 @@ export default {
                 { title: hintedTitle, url: hintedUrl, desc: '' }, env, origin
               );
               if (doc && doc.text) {
-                const slice = windowSlice(doc.text, terms, DOC_CHAR_CAP);
-                if (slice.length >= 200) {
+                const slice = selectContext(doc.text, terms, DOC_CHAR_CAP);
+                if (slice.trim()) {
                   primaryContext =
                     `\n--- source: ${hintedUrl}\ntitle: ${hintedTitle}\n---\n${slice}`;
                 }
@@ -488,8 +479,8 @@ export default {
         // Build primary context (own budget)
         let primaryContext = '';
         if (primaryDoc && primaryDoc.text) {
-          const slice = windowSlice(primaryDoc.text, terms, DOC_CHAR_CAP);
-          if (slice.length >= 200) {
+          const slice = selectContext(primaryDoc.text, terms, DOC_CHAR_CAP);
+          if (slice.trim()) {
             primaryContext =
               `\n--- source: ${primaryDoc.url}\ntitle: ${primaryDoc.title}\n---\n${slice}`;
           }
@@ -500,8 +491,8 @@ export default {
         let used = 0;
         for (const d of supportingDocs) {
           const cap = Math.min(DOC_CHAR_CAP, TOTAL_CHAR_CAP - used);
-          const slice = windowSlice(d.text, terms, cap);
-          if (slice.length < 200) continue;
+          const slice = selectContext(d.text, terms, cap);
+          if (!slice.trim()) continue;
           suppContext += `\n\n--- source: ${d.url}\ntitle: ${d.title}\n---\n${slice}`;
           used += slice.length;
         }
@@ -586,13 +577,17 @@ export default {
           while (true) {
             let readResult;
             if (firstToken) {
-              const timeout = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('first token timeout')), PROVIDER_FIRST_TOKEN_MS));
+              let timer: ReturnType<typeof setTimeout> | undefined;
+              const timeout = new Promise<never>((_, reject) => {
+                timer = setTimeout(() => reject(new Error('first token timeout')), PROVIDER_FIRST_TOKEN_MS);
+              });
               try {
                 readResult = await Promise.race([reader.read(), timeout]);
               } catch {
                 reader.cancel();
                 break;
+              } finally {
+                clearTimeout(timer);
               }
               firstToken = false;
             } else {

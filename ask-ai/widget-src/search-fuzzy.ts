@@ -37,12 +37,12 @@ const vocabPromise: Promise<void> = fetch("/data/search-vocab.json")
 function ed1Variants(word: string): Set<string> {
     const variants = new Set<string>();
     const alpha = "abcdefghijklmnopqrstuvwxyz0123456789";
-    for (let i = 0; i < word.length; i++) {
-        variants.add(word.slice(0, i) + word.slice(i + 1)); // deletion
+    for (let i = 0; i <= word.length; i++) {
+        if (i < word.length) variants.add(word.slice(0, i) + word.slice(i + 1)); // deletion
         for (let j = 0; j < alpha.length; j++) {
             const ch = alpha[j];
             variants.add(word.slice(0, i) + ch + word.slice(i)); // insertion
-            variants.add(word.slice(0, i) + ch + word.slice(i + 1)); // substitution
+            if (i < word.length) variants.add(word.slice(0, i) + ch + word.slice(i + 1)); // substitution
         }
     }
     for (let k = 0; k < word.length - 1; k++) {
@@ -59,6 +59,7 @@ function correctWord(word: string): string {
     if (vocabStopwords[lower]) return word;
     if (vocabAliases[lower]) return vocabAliases[lower];
     if (vocabSet.has(lower)) return word;
+    if (/[._+#]/.test(lower)) return word; // preserve code identifiers and language names
     // ED1 fuzzy: find unambiguous corrections
     const hits: string[] = [];
     const ed1set = ed1Variants(lower);
@@ -71,7 +72,7 @@ function correctWord(word: string): string {
 /* ---- apply correction to a query string ---- */
 function fuzzyCorrect(query: string): string {
     if (!vocabReady || !vocabSet || vocabSet.size === 0) return query;
-    return query.replace(/[A-Za-z0-9]+/g, (m: string) => correctWord(m));
+    return query.replace(/[A-Za-z0-9][A-Za-z0-9+.#_-]*/g, (m: string) => correctWord(m));
 }
 
 // Exposed for transport.ts — applies vocab-based ED1 correction to queries
